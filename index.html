@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>小栗的角落 · v5.3</title>
+<style>
+:root { color-scheme: light; font-family: -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; color:#544558; }
+*{box-sizing:border-box} html,body{margin:0;min-height:100%;height:100%;}
+body{background:radial-gradient(ellipse at 75% 75%,#f2e5f1 0,transparent 48%),radial-gradient(ellipse at 15% 5%,#fffef8,transparent 45%),linear-gradient(135deg,#eef3f7 0%,#f7f0f7 90%);overflow:hidden;}
+.note{animation:fadeHint 10s ease forwards;position:fixed;top:26px;left:30px;font-size:12px;color:#a096a4;line-height:1.9;pointer-events:none}.note b{font-size:14px;font-weight:500;color:#776e84}
+.corner{position:fixed;right:18px;bottom:10px;width:320px;height:430px;isolation:isolate;user-select:none}
+.ground{position:absolute;bottom:10px;right:17px;width:235px;height:35px;border-radius:50%;background:radial-gradient(ellipse,#87718a2c,transparent 72%);pointer-events:none}
+.avatar{position:absolute;bottom:2px;right:26px;width:256px;height:256px;cursor:pointer;filter:drop-shadow(0 10px 7px #65516d2e);touch-action:manipulation;outline-offset:-8px;border-radius:20px}
+.avatar:focus-visible{outline:2px solid #a890b3}canvas{width:100%;height:100%;image-rendering:pixelated}
+.bubble{position:absolute;right:17px;bottom:263px;width:260px;min-height:54px;background:#fffdfb;border:1px solid #ece0eb;border-radius:17px 17px 4px 17px;padding:12px 15px;box-shadow:0 9px 28px #60495a20;font-size:13px;line-height:1.7;z-index:5;animation:enter .2s ease}
+.bubble:after{content:"";position:absolute;right:48px;bottom:-7px;width:12px;height:12px;background:#fffdfb;transform:rotate(45deg);border-right:1px solid #ece0eb;border-bottom:1px solid #ece0eb}
+.bubble .tiny{font-size:10px;color:#ae9baa;letter-spacing:.08em;margin-bottom:4px}
+.chat{position:absolute;bottom:269px;right:0;width:315px;background:#fffcfc;border:1px solid #eadcea;border-radius:20px;padding:12px;box-shadow:0 16px 38px #5b486327;z-index:8;animation:enter .2s ease}
+.chat-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-left:5px;font-size:12px;font-weight:600}
+.chat-head button{border:0;background:none;font-size:21px;color:#95889a;cursor:pointer;width:30px;height:30px}
+.history{height:210px;overflow:auto;display:flex;flex-direction:column;gap:9px;padding:5px 3px 8px;overscroll-behavior:contain;user-select:text}
+.line{align-self:flex-start;background:#f6eff7;padding:9px 11px;border-radius:13px 13px 13px 4px;max-width:93%;font-size:12px;line-height:1.65;overflow-wrap:anywhere;white-space:pre-wrap;user-select:text}
+.line.user{align-self:flex-end;background:#eaf0fc;border-radius:13px 13px 4px 13px}
+.line.notice{align-self:center;background:#fff7e9;color:#806848;border:1px solid #f2e0c5;font-size:11px}
+.entry{display:flex;gap:7px;align-items:flex-end}.entry textarea{min-width:0;flex:1;border:1px solid #e9dfeb;border-radius:12px;padding:10px 11px;background:white;color:#534558;outline:none;font:inherit;font-size:12px;line-height:18px;resize:none;min-height:40px;max-height:112px;overflow-y:auto;white-space:pre-wrap;user-select:text}.entry textarea:focus{border-color:#af93bd}
+.entry button{min-width:55px;border:0;border-radius:12px;background:#826d98;color:white;font-size:12px;cursor:pointer;min-height:39px}.entry button:disabled{opacity:.55;cursor:wait}.status{font-size:10px;margin:9px 3px 1px;color:#9a8ea0;text-align:center;min-height:13px}
+.hidden{display:none!important}@keyframes fadeHint{0%,72%{opacity:1}100%{opacity:0}}@keyframes enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:600px){.corner{right:0;bottom:0}.note{left:17px;top:16px}}
+@media(prefers-reduced-motion:reduce){.bubble,.chat{animation:none}}
+</style>
+</head>
+<body>
+<div class="note"><b>小栗住在这里。</b><div>点点她，就可以说话。</div><div id="dayline"></div></div>
+<section class="corner" aria-label="小栗的角落">
+ <div class="ground"></div>
+ <div class="bubble hidden" id="bubble" role="status"><div class="tiny" id="bubble-label">小栗的碎碎念</div><div id="bubble-text"></div></div>
+ <div class="chat hidden" id="chat">
+  <div class="chat-head"><span>和小栗说说话</span><button id="close" type="button" aria-label="关闭聊天">×</button></div>
+  <div class="history" id="history" aria-live="polite"></div>
+  <form class="entry" id="form"><textarea id="message" aria-label="给小栗发消息" autocomplete="off" maxlength="600" rows="1" placeholder="说点什么…"></textarea><button id="send" type="submit">发送</button></form>
+  <div class="status" id="status">正在看看今天做什么…</div>
+ </div>
+ <div class="avatar" id="avatar" role="button" tabindex="0" title="和小栗说话" aria-label="打开与小栗的聊天"><canvas id="sprite" width="128" height="128" aria-label="带天线的长发像素女孩"></canvas></div>
+</section>
+<script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id);const canvas=$('sprite'),ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=false;
+const STORE='chestnut_v53_offline';const NOW=()=>new Date();const rand=(a)=>a[Math.floor(Math.random()*a.length)];
+const ACT={sleep:'睡觉',rest:'休息',cook:'做饭',work:'工作',hobby:'捣鼓她的小研究',walk:'散步',read:'看书'};
+const IDEAS=['学做家常菜','观察街头日常','照顾窗台植物','练习画速写','整理自己的小房间','研究有趣的地球发明'];
+function schedule(d){const h=d.getHours(),day=d.getDay(),weekend=day===0||day===6;
+ if(h<7)return 'sleep';if(h<8)return 'rest';if(h<9)return 'cook';
+ if(weekend){if(h<11)return 'hobby';if(h<12)return 'walk';if(h<13)return 'cook';if(h<16)return 'read';if(h<19)return 'hobby';if(h<20)return 'cook';if(h<23)return 'read';return 'rest';}
+ if(h<12)return 'work';if(h<13)return 'cook';if(h<17)return 'work';if(h<19)return 'hobby';if(h<20)return 'walk';if(h<21)return 'cook';if(h<23)return 'read';return 'rest';}
+let demo;try{demo=JSON.parse(localStorage.getItem(STORE)||'null')}catch{}
+const fresh={date:'',interest:rand(IDEAS),goal_step:0,mood:.64,emotion:'curious',energy:.7,signal:false,activity:'rest',history:[],last_event:0,next_speak:Date.now()+4800000,last_phrase:''};
+demo=demo&&typeof demo==='object'?{...fresh,...demo,goal_step:demo.goal_step??demo.progress??0,next_speak:demo.next_speak??demo.nextSpeak??fresh.next_speak}:fresh;
+let reactionGesture='none',reactionUntil=0,reactionStarted=0;
+let state=demo,chatOpen=false,serverConnected=false,chatReady=false,thoughtReady=false,simulated=false,sending=false,thinkBusy=false,bubbleTimer=null,loadedHistory=false,lastEvent='',history=[],demoAction='',demoUntil=0,demoEmotion='',demoEmotionUntil=0,offlineQuietUntil=0;
+const isFile=location.protocol==='file:';const isLocalServer=location.hostname==='127.0.0.1'||location.hostname==='localhost';
+function save(){try{localStorage.setItem(STORE,JSON.stringify(demo))}catch{}}
+function offlineTick(){let d=NOW().toLocaleDateString('en-CA');if(demo.date!==d){demo.date=d;}
+ demo.activity=schedule(NOW());if(Date.now()-(demo.last_event||0)>20*60000){demo.last_event=Date.now();const effects=[[-.07,'把刚泡的茶弄洒了一点'],[.11,'总算搞定一件麻烦的小事'],[.06,'窗外的光刚好落在桌角'],[-.04,'翻了几页书却看不进去'],[.09,'想到了一个更省事的做饭方法']];const [delta,event]=rand(effects);demo.mood=Math.max(.12,Math.min(.96,demo.mood+delta));demo.emotion=delta>.05?'happy':delta<-.05?'annoyed':'curious';lastEvent=event;demo.signal=Math.random()<.045;}state=demo;save();}
+function setStatus(s){$('status').textContent=s}
+function showTime(){const date=NOW();$('dayline').textContent=new Intl.DateTimeFormat('zh-CN',{hour:'2-digit',minute:'2-digit'}).format(date)+' · '+(ACT[state.activity]||'发呆');}
+function speak(text,label='小栗的碎碎念'){if(chatOpen||Date.now()<offlineQuietUntil||NOW().getHours()<8||NOW().getHours()>=23)return;$('bubble-text').textContent=text;$('bubble-label').textContent=label;$('bubble').classList.remove('hidden');clearTimeout(bubbleTimer);bubbleTimer=setTimeout(()=>$('bubble').classList.add('hidden'),14000)}
+function add(role,text){const item=document.createElement('div');item.className='line'+(role==='user'?' user':role==='notice'?' notice':'');item.textContent=text;$('history').appendChild(item);$('history').scrollTop=$('history').scrollHeight;return item;}
+function showChat(){if(chatOpen)return;chatOpen=true;$('bubble').classList.add('hidden');$('chat').classList.remove('hidden');$('history').replaceChildren();history.slice(-24).forEach(x=>add(x.role,x.content));if(!history.length)add('assistant','你来啦。我刚才在'+(ACT[state.activity]||'发呆')+'。');$('message').focus();}
+function hideChat(){chatOpen=false;$('chat').classList.add('hidden');}
+function resizeMessage(){
+  const el=$('message');el.style.height='40px';
+  el.style.height=Math.min(112,Math.max(40,el.scrollHeight))+'px';
+}
+$('message').addEventListener('input',resizeMessage);
+$('message').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229){
+    e.preventDefault();$('form').requestSubmit();
+  }
+});
+function react(data){
+  if(data&&data.state)state=data.state;
+  const allowed=['none','look_up','tilt','nod','shake','bounce','wake'];
+  const gesture=data?.gesture;
+  if(allowed.includes(gesture)&&gesture!=='none'){
+    reactionGesture=gesture;reactionStarted=Date.now();reactionUntil=reactionStarted+6000;
+  }
+}
+function offlineReply(t){
+ if(/你.*(做|干)|在干嘛|在做什么/.test(t))return '刚才在'+(ACT[state.activity]||'发呆')+'。其实还想找时间继续「'+state.interest+'」。';
+ if(/母星|天线|外星/.test(t))return '这事我还没完全弄明白。等能自由聊天了，再认真跟你说。';
+ if(/心情|开心|难过|烦恼/.test(t))return '我听见了。不过我现在只是离线试玩模式，没办法好好接住这段话。';
+ return rand(['我听见了，不过现在是离线试玩，还不能自由聊。','你先说着；等接通 AI，我们可以认真聊这个。']);
+}
+function connectionStatus(){
+ if(!serverConnected)return '离线试玩 · 仅预设台词，未调用 AI';
+ if(simulated)return '开发模拟 AI · 不是真实云端回复';
+ if(!chatReady)return '本地服务已启动 · 聊天 AI 尚未配置';
+ return '真实 AI 已配置 · 可以聊天';
+}
+async function pullState(){
+ if(isFile||!isLocalServer){serverConnected=false;chatReady=false;thoughtReady=false;simulated=false;
+   offlineTick();if(!sending)setStatus(connectionStatus());showTime();return;}
+ try{
+   const res=await fetch('/api/state',{signal:AbortSignal.timeout(5000),cache:'no-store'});
+   if(!res.ok)throw new Error('无法读取小栗的状态');
+   const data=await res.json();
+   state=data.state;serverConnected=true;
+   const caps=data.capabilities||{};
+   if(caps.version!=='5.3'){
+     chatReady=false;thoughtReady=false;simulated=false;
+     setStatus('当前仍连接旧版小栗服务。请停止旧服务，再启动 v5.3');showTime();return;
+   }
+   chatReady=!!caps.chat?.configured;
+   thoughtReady=!!caps.thought?.configured;simulated=!!caps.mock;
+   if(!sending)setStatus(connectionStatus());
+   if(!loadedHistory&&!sending){
+     history=(data.history||[]).map(x=>({role:x.role,content:x.text}));loadedHistory=true;
+     if(chatOpen){$('history').replaceChildren();history.slice(-24).forEach(x=>add(x.role,x.content));}
+   }
+ }catch{serverConnected=false;chatReady=false;thoughtReady=false;simulated=false;
+   offlineTick();if(!sending)setStatus(connectionStatus());}
+ showTime();
+}
+function localCommand(msg){
+ const show=/(演示|给我看看|表演|模拟|试一下动作)/.test(msg);
+ if(show){const faces=[['开心','happy'],['高兴','happy'],['好奇','curious'],['生气','annoyed'],['烦躁','annoyed'],['难过','sad'],['伤心','sad'],['困','sleepy'],['得意','proud'],['平静','neutral']];
+  const choice=faces.find(x=>msg.includes(x[0]));if(choice){demoEmotion=choice[1];demoEmotionUntil=Date.now()+30000;demoAction='rest';demoUntil=Date.now()+30000;return '好！我给你看看「'+choice[0]+'」是什么表情。';}}
+
+ if(show){const examples=[['睡觉','sleep'],['睡','sleep'],['工作','work'],['上班','work'],['敲键盘','work'],['读书','read'],['看书','read'],['做饭','cook'],['吃饭','cook'],['散步','walk'],['走路','walk'],['研究','hobby'],['捣鼓','hobby'],['发呆','rest']];
+  const action=examples.find(x=>msg.includes(x[0]));if(action){demoAction=action[1];demoUntil=Date.now()+30000;return '好呀！我先演示一小会儿「'+ACT[action[1]]+'」。';}}
+ if(!serverConnected&&/(不用安静|恢复说话|可以说话|解除安静)/.test(msg)){offlineQuietUntil=0;return '好，可以正常聊天了。';}
+ if(!serverConnected&&/(安静|先别打扰|免打扰)/.test(msg)){offlineQuietUntil=Date.now()+60*60000;return '好，我先安静一小时。你叫我，我还是会回应的。';}
+ return null;
+}
+async function submit(ev){
+ ev.preventDefault();if(sending)return;
+ const msg=$('message').value.trim();if(!msg)return;
+ $('message').value='';resizeMessage();
+ const local=localCommand(msg);
+ if(local){
+   add('user',msg);add('assistant',local);
+   if(!serverConnected){history.push({role:'user',content:msg},{role:'assistant',content:local});
+     demo.history=history.slice(-30);save();}
+   setStatus('动作指令已执行');$('message').focus();return;
+ }
+ if(!serverConnected){
+   const reply=offlineReply(msg);
+   add('user',msg);add('assistant','[离线预设] '+reply);
+   history.push({role:'user',content:msg},{role:'assistant',content:'[离线预设] '+reply});
+   history=history.slice(-30);demo.history=history;save();
+   setStatus(connectionStatus());$('message').focus();return;
+ }
+ if(!chatReady){
+   $('message').value=msg;resizeMessage();
+   setStatus('还没有配置聊天 AI：先启动本地服务并设置 API Key');
+   add('notice','还不能发送给云端 AI。先配置 API Key，或者下载 HTML 离线试玩。');
+   return;
+ }
+ sending=true;$('send').disabled=true;
+ const outgoing=add('user',msg);setStatus('小栗正在想…');
+ try{
+   const res=await fetch('/api/chat',{
+       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg}),
+       signal:AbortSignal.timeout(34000)});
+   const data=await res.json();if(!res.ok)throw new Error(data.error||'云端模型连接失败');
+   const reply=data.reply||'';if(!reply)throw new Error('模型没有返回文字');
+   add('assistant',reply);react(data);
+   history.push({role:'user',content:msg},{role:'assistant',content:reply});
+   history=history.slice(-30);demo.history=history;save();
+   setStatus(data.source==='mock'?'开发模拟回复 · 非真实 AI':data.source==='local'?'本地指令已执行':'真实 AI 回复成功');
+ }catch(err){
+   outgoing.remove();
+   add('notice','这次没有发成功：'+String(err.message).slice(0,100)+'。消息已留在输入框，可以重试。');
+   // An unsuccessful request is not stored as a successful conversation turn.
+   $('message').value=msg;resizeMessage();
+   setStatus('发送失败 · 未用预设回复冒充 AI');
+ }finally{sending=false;$('send').disabled=false;if(chatOpen)$('message').focus();}
+}
+$('form').addEventListener('submit',submit);$('avatar').addEventListener('click',()=>chatOpen?hideChat():showChat());$('avatar').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();chatOpen?hideChat():showChat();}});$('close').addEventListener('click',hideChat);document.addEventListener('keydown',e=>{if(e.key==='Escape')hideChat()});
+async function think(){if(!serverConnected||!thoughtReady||thinkBusy||NOW().getHours()<8||NOW().getHours()>=23||Date.now()<Number(state.next_thought||0)*1000)return;thinkBusy=true;try{const res=await fetch('/api/think',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(32000)});const data=await res.json();if(res.ok&&data.state)state=data.state;if(res.ok&&data.reply){if(!chatOpen&&Date.now()>=demo.next_speak){speak(data.reply,data.source==='mock'?'模拟念头 · 非真实AI':'小栗突然想到');demo.next_speak=Date.now()+3600000+Math.random()*7200000;save();}}}catch{}finally{thinkBusy=false;}}
+function tick(){pullState().then(()=>{if(serverConnected)think();else if(Date.now()>=demo.next_speak){speak(rand(['刚刚发现一家店的招牌设计得挺有意思。','今天有点想学一道新菜。','本来打算读书，结果看了半天窗外。']));demo.next_speak=Date.now()+3600000+Math.random()*7200000;save();}});}
+// 128×128 native grid. Sleep renders the SAME standing girl sprite rotated a true 90°; no rescaling.
+// v5.2 preserves the approved rotated sleep and the existing activity animations.
+function draw(ms){
+ const c=ctx;c.clearRect(0,0,128,128);c.imageSmoothingEnabled=false;
+ let activity=Date.now()<demoUntil?demoAction:(state.activity||'rest');
+ if(chatOpen&&activity==='sleep')activity='rest'; // She wakes to talk; persistent sleep schedule is unchanged.
+ const mood=Number(state.mood??.55),t=ms/1000;
+ const emotion=Date.now()<demoEmotionUntil?demoEmotion:(state.emotion||'neutral');
+ const walking=activity==='walk', sleeping=activity==='sleep', working=activity==='work', reading=activity==='read', cooking=activity==='cook', hobby=activity==='hobby';
+ const stepCycle=Math.sin(t*7);
+ const leftFootLift=walking?Math.max(0,Math.round(stepCycle*3)):0;
+ const rightFootLift=walking?Math.max(0,Math.round(-stepCycle*3)):0;
+ const lift=cooking?Math.round((1+Math.sin(t*5))*3):0;
+ const happy=['happy','proud'].includes(emotion)||mood>.77,sad=['sad','sleepy'].includes(emotion)||mood<.29;
+ const skin='#f4c9b3', blush='#e5a3ad', hair='#694e60', hairDark=hair, hairTop=hair, dress='#c8b2da', dressEdge='#aa91c1', skirt='#917ba6', shoe='#6c587a', eye='#5b4455';
+ const R=(x,y,w,h,color)=>{c.fillStyle=color;c.fillRect(Math.round(x),Math.round(y),Math.max(1,Math.round(w)),Math.max(1,Math.round(h)));};
+ const L=(pts,color,w=2)=>{c.strokeStyle=color;c.lineWidth=w;c.lineJoin='round';c.lineCap='round';c.beginPath();pts.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.stroke();};
+ // A quantized curved line, drawn on the same native pixel grid as the sprite.
+ const pixelCurve=(ax,ay,cx,cy,bx,by,color,width=2)=>{for(let i=0;i<=42;i++){const k=i/42,j=1-k;R(Math.round(j*j*ax+2*j*k*cx+k*k*bx),Math.round(j*j*ay+2*j*k*cy+k*k*by),width,width,color);}};
+ function girl(asleep=false){
+   // Feet and simple alternating stride, no mysterious motion traces.
+   R(44,105,9,15-leftFootLift,'#7a6f8f');R(60,105,9,15-rightFootLift,'#7a6f8f');
+   R(41,120-leftFootLift,15,4,shoe);R(58,120-rightFootLift,15,4,shoe);
+   // Single unanimated long hairstyle BEHIND body, well below both shoulders.
+   R(36,35,40,64,hairDark);
+   R(31,45,11,65,hair); R(72,45,11,65,hair);
+   R(34,107,8,8,hair);R(72,107,8,8,hair);  // simple, visible straight ends
+   // Clothes overlap hair, so no stray strands down the front.
+   R(43,71,29,28,dress);R(40,94,35,12,dress);R(38,105,39,8,skirt);
+   R(48,74,20,5,'#dfd0eb');R(42,99,32,3,dressEdge);
+   // LEFT arm always rests naturally during cooking. Right arm is drawn
+   // separately for cooking, so we never show an extra default right hand.
+   const arm=walking?Math.round(stepCycle*2):working?Math.round(Math.sin(t*12)*1):0;
+   R(35,77-arm,9,22,dress);R(36,96-arm,8,6,skin);
+   if(!cooking){R(73,77+arm,9,22,dress);R(74,96+arm,8,6,skin);}
+   // Head and side ears.
+   R(51,67,11,7,skin); R(42,43,32,25,skin);
+   R(40,49,3,9,skin);R(74,49,3,9,skin);
+   // Continuous rounded crown, no horizontal band or hair-accessory silhouette.
+   // Gradual stepped edges form a gentle curved top; antenna grows through hair.
+   R(49,29,19,4,hairDark);
+   R(44,33,29,4,hairDark);
+   R(41,37,35,5,hairDark);
+   R(39,42,38,6,hairDark);
+   R(43,42,29,4,hair);
+   R(40,44,4,8,hair);R(73,44,4,8,hair);
+   // Emotion-dependent pixel expressions. Sleep face is EXACTLY the approved v4.6 face.
+   const blink=Math.sin(t*1.8)>.992;
+   const glance=Date.now()<reactionUntil&&reactionGesture==='look_up'?-1:0;
+   if(asleep){
+     R(49,54,3,1,eye);R(65,54,3,1,eye);R(59,63,2,2,eye);
+   } else {
+     if(emotion==='annoyed'){
+       R(47,50,6,1,eye);R(64,50,6,1,eye);
+       R(49,54,3,blink?1:2,eye);R(65,54,3,blink?1:2,eye);
+       R(57,63,5,1,eye);
+     } else if(emotion==='sad'){
+       R(47,52,5,1,eye);R(65,52,5,1,eye);
+       R(49,55,3,blink?1:2,eye);R(65,55,3,blink?1:2,eye);
+       R(57,64,5,1,eye);
+     } else if(emotion==='sleepy'){
+       R(49,55,4,1,eye);R(65,55,4,1,eye);
+       R(58,63,3,2,eye);
+     } else if(emotion==='happy'||emotion==='proud'){
+       R(49,55,4,blink?1:2,eye);R(65,55,4,blink?1:2,eye);
+       R(57,62,2,1,eye);R(59,63,3,1,eye);R(62,62,2,1,eye);
+     } else if(emotion==='curious'){
+       R(49,53+glance,3,blink?1:4,eye);R(65,53+glance,3,blink?1:4,eye);
+       R(59,63,2,2,eye);
+     } else {
+       R(49,54+glance,3,blink?1:3,eye);R(65,54+glance,3,blink?1:3,eye);
+       R(57,63,5,1,eye);
+     }
+     if(emotion!=='annoyed'&&emotion!=='sleepy'){
+       R(47,59,5,2,blush);R(66,59,5,2,blush);
+     }
+   }
+   // Mood antenna curves organically, but long hair remains still.
+   const signal=!!state.signal;
+   let tipX,tipY;
+   if(asleep){tipX=43+Math.sin(t*.7)*2;tipY=16;}
+   else if(signal){tipX=57+Math.sin(t*14)*3;tipY=6;}
+   else if(sad){tipX=39+Math.sin(t)*2;tipY=22;}
+   else if(emotion==='annoyed'){tipX=61+Math.sin(t*7)*3;tipY=13;}
+   else if(happy){tipX=64+Math.sin(t*7)*5;tipY=6+Math.cos(t*7)*2;}
+   else{tipX=56+Math.sin(t*2.1)*5;tipY=13+Math.sin(t*1.3)*2;}
+   pixelCurve(57,29,sad?42:62,sad?16:9,tipX,tipY,hairDark,2);
+   R(tipX-2,tipY-2,5,5,signal?'#ffdfa0':sad?'#b8a2c0':'#ebafc9');R(tipX-1,tipY-1,2,2,'#fff3f6');
+ }
+ if(sleeping){
+   // Pillow and mattress remain fixed, no awkward portrait-to-profile redraw.
+   R(8,122,117,5,'#b5a2c7');
+   R(8,117,117,6,'#dfd2e9');
+   R(24,105,52,13,'#f9f3f1');
+   R(25,105,50,3,'#fffaf8');
+   // Rotate the ENTIRE existing front-facing character 90° counterclockwise.
+   // This puts the head on the left, legs on the right. Both original eyes
+   // become vertical | | marks and the little mouth sits to their right:
+   //     |   o
+   //     |
+   // Integer translation + exact right-angle rotation retain pixel crispness.
+   c.save();
+   c.translate(0,149);
+   c.rotate(-Math.PI/2);
+   girl(true);
+   c.restore();
+   requestAnimationFrame(draw);return;
+ }
+ c.save();
+ const reacting=Date.now()<reactionUntil;
+ const rt=reacting?(Date.now()-reactionStarted)/1000:0;
+ const gx=reacting&&reactionGesture==='shake'?Math.round(Math.sin(rt*14)*2):reacting&&reactionGesture==='tilt'?1:0;
+ const gy=reacting&&reactionGesture==='nod'?Math.round(Math.sin(rt*9)):reacting&&reactionGesture==='bounce'?-Math.round(Math.abs(Math.sin(rt*8))*2):0;
+ c.translate(19+gx,gy);
+ if(walking)c.translate(Math.round(Math.sin(t*3.5)*0.8),Math.round(Math.sin(t*14)*0.7));
+ girl(false);
+ // The activity props are intentionally sparse, with no background clutter.
+ if(working){
+   R(22,104,70,3,'#9c8c9e');R(35,86,42,17,'#8090ab');R(38,89,36,12,'#afbdd0');R(42,93,27,5,'#cfdae6');R(44,104,23,2,'#72667e');
+ }
+ else if(reading){
+   R(28,85,24,20,'#fff1d9');R(55,85,24,20,'#f4e0bf');R(52,86,3,18,'#ac8898');R(32,90,16,1,'#b89c9e');R(61,90,13,1,'#b89c9e');
+ }
+ else if(cooking){
+   // Small FIXED flame; only the skillet, its handle, right sleeve and grip move.
+   R(45,102,6,5,'#eb9463');R(49,99,7,8,'#f7b661');
+   R(55,102,5,5,'#e98f59');R(51,103,4,4,'#ffe1a0');
+   const y=84-lift;
+   // Right sleeve: joins shoulder (near x=77,y=80) to wrist (x=84,y=y+4).
+   // It changes length and angle as the pan rises and falls, but there is
+   // only ONE visible right hand. The left hand remains at the left side.
+   c.fillStyle=dress; c.beginPath();
+   c.moveTo(74,76); c.lineTo(80,76); c.lineTo(85,y);
+   c.lineTo(85,y+7); c.lineTo(77,85); c.lineTo(73,84);
+   c.closePath(); c.fill(); // one continuous sleeve from shoulder to grip
+   // One compact skillet, with its handle physically attached to the rim.
+   R(35,y,29,3,hairDark);R(37,y+3,25,7,'#8d778f');
+   R(42,y+10,16,2,hairDark);R(42,y+1,15,2,'#e7b282');
+   R(64,y+2,19,4,hairDark);R(67,y+3,16,1,'#b4a3b7');
+   // A single hand wraps around the outer handle, covering the sleeve endpoint.
+   R(81,y,8,8,skin);R(79,y+2,4,4,skin);
+ }
+ else if(hobby){
+   R(23,102,66,3,'#a895a5');R(36,87,39,15,'#eae1c4');R(40,91,30,1,'#bca7b2');R(48,95,4,4,'#a9819b');R(62,94,4,3,'#957d9b');
+ }
+ // Walk needs only swinging limbs; there are deliberately no trail bars or decorative props.
+ c.restore();
+ requestAnimationFrame(draw);
+}
+function start(){offlineTick();history=(demo.history||[]).slice(-20);showTime();pullState();requestAnimationFrame(draw);setInterval(tick,60_000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick()});setTimeout(()=>speak('今天想把手头的事慢慢做好。先从一件小事开始。'),3200);}
+start();
+})();
+</script>
+</body>
+</html>
