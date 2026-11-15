@@ -1,4 +1,4 @@
-"""v5.3: schema, true/future boundary, stage removal, persistence and real chat round trip (fake model)."""
+"""v5.4: schema, true/future boundary, stage removal, persistence and real chat round trip (fake model)."""
 import os
 import json
 import tempfile
@@ -12,9 +12,6 @@ spec=importlib.util.spec_from_file_location('pal',Path(__file__).parent/'server.
 pal=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pal)
 assert pal.CANON['employment'].find('小书店')>=0
-assert '不想聊' in pal.SYSTEM and '编造成事实' in pal.SYSTEM
-assert '角色扮演' not in pal.CHAT_FORMAT
-assert '用户：我找工作找了一年' in pal.CHAT_FORMAT
 assert pal.parse_chat_response('{"reply":"（天线耷拉）我在小书店兼职。","emotion":"curious","gesture":"nod"}')==('我在小书店兼职。','curious','nod')
 assert pal.parse_chat_response('{"reply":"我还没想过。","emotion":"INVALID","gesture":"laser"}')[1:]==('neutral','none')
 
@@ -25,8 +22,16 @@ with tempfile.TemporaryDirectory() as tmp:
         pal.memorize(c,'story','天线曾收到一段信号',3)
         c.execute('INSERT INTO messages(at,role,text) VALUES(?,?,?)',(1,'assistant','（天线弯成问号）在气态行星上开工。'))
         c.execute('INSERT INTO messages(at,role,text) VALUES(?,?,?)',(2,'user','那你有工作吗？'))
+        pal.journal(c,'idea','明天想练习做汤')
+        pal.journal(c,'experience','昨晚做了蛋炒饭')
+        pal.memorize(c,'user','用户喜欢红茶',4)
         context=pal.context(c,pal.get_state(c),'有工作吗')
         assert '气态行星上开工' not in context and '小书店兼职' in context
+        facts=json.loads(context)
+        assert facts['想法与计划']==['明天想练习做汤']
+        assert facts['已记录的近期经历']==['昨晚做了蛋炒饭']
+        assert facts['相关经历']==['天线曾收到一段信号']
+        assert facts['用户相关记忆']==['用户喜欢红茶']
     orig=pal.request_ai
     calls=[]
     def fake(which,system,prompt,max_tokens,kind='chat'):
@@ -53,7 +58,7 @@ with tempfile.TemporaryDirectory() as tmp:
             assert sum('天线耷拉' in r['text'] for r in rows)==0
             state=pal.get_state(c);assert state['emotion']=='sad' and state['chat_gesture']=='look_up'
         with urlopen(base+'/api/state',timeout=5) as r:state=json.load(r)
-        assert state['capabilities']['version']=='5.3'
+        assert state['capabilities']['version']=='5.4'
         print('PASS canon / unknown facts / stage-free JSON reply / emotional event / stable SQLite')
     finally:
         server.shutdown();server.server_close();pal.request_ai=orig

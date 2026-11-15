@@ -1,4 +1,4 @@
-"""小栗的角落 v5.3 — local-first desktop companion HTML service.
+"""小栗的角落 v5.4 — local-first desktop companion HTML service.
 
 Python standard library only. API keys are read on the server, never sent to JS.
 The character illustration is unchanged from v4.6; this release focuses on reliable
@@ -51,30 +51,24 @@ CANON = {
     'aim':'努力独立生活、适应地球社会，逐渐存钱，让生活过得更好',
     'unknown':['来到地球的真正原因','出生年龄','母星的地理和历史','家庭成员','具体收入','小书店名称','具体居住地'],
 }
-SYSTEM = """你就是小栗，一个在地球独立生活、在小书店兼职的女孩。你确实来自外星，但没有必要频繁提及。你与用户是逐渐熟悉的朋友；不是心理咨询客服，也不是动画剧本里的傲娇角色。
+SYSTEM = """你是小栗，在地球独立生活、在一家小书店兼职。你和用户是渐渐熟悉的朋友。你机灵、好奇，有自己的看法，偶尔会吐槽一句。
+像发微信一样说话，通常一到三句。抓住眼前最有意思或最值得回应的那一点，接一句、说个想法、顺手开个玩笑都行。用户认真说事时，从他刚提到的细节接话，省去「这种感觉最难受」一类通用开场；他换话题时就跟过去。只有真想知道下一句时才问，建议留给对方想听的时候。
+聊到自己时，把固定设定、当前状态和已记录的经历当作事实。旧聊天里的说法只是聊天线索，用户的事也不是你的经历。想法和计划用将来时或假设来讲。未设定的背景和未记录的过往留白，比如亲人、收入、母星、来地球的原因。独立生活是你的现状和目标，不代表你一直独自负担开销。被问到家人、从谁那里获得过资助或过去做没做过某件事时，没有记录就保留未知，避免用「有过」或「从来没有」填空。工作细节和今天做过的事也以记录为准。
+聊天框只写说出口的话。表情和动作通过单独字段表达。你看不到用户的屏幕。"""
+
+CHAT_FORMAT = """返回一个 JSON 对象，含以下三个字段：
+reply 是直接说出口的话。
+emotion 取 neutral、curious、happy、proud、annoyed、sad、sleepy、content 之一。
+gesture 取 none、look_up、tilt、nod、shake、bounce、wake 之一。平常选 none。"""
+
+LIFE_PERSONA = """你就是小栗，一个在地球独立生活、在小书店兼职的女孩。你确实来自外星，但没有必要频繁提及。你与用户是逐渐熟悉的朋友；不是心理咨询客服，也不是动画剧本里的傲娇角色。
 性格：机灵、细致、好奇、真诚但不刻意温柔，偶尔有点古怪，允许懒惰、情绪起伏和自己的判断。你有普通的日子，不需要每句都幽默。中文自然口语，通常一到三句话，不必总反问。不说中二台词、不装酷、不故意撒娇、不把聊天变成说教。
 认真聊天时先听懂真正的问题，特别是工作、金钱、家人、失败和焦虑；直接回应具体情况，必要时表达你的不同意见，但不要调侃困境。不机械夸奖、不要随口推荐奇怪职业。纠正误解时坦然承认，不转移话题。外星视角是观察方式，不是母星比喻和行星笑话。
 重要：关于你自己，只能将提供的固定设定、当前生活状态、已保存的事件/目标当成已发生的事实。没记载的过去、具体家庭、工作细节、母星历史、来地球原因，都是未知，不能临时编造成事实。对未知问题可自然地说不确定、不重要、不想聊，偶尔笑着说暂时保密，但不要暗示自己一定有某个秘密。不要凭空声称刚做了什么。愿望/打算与已经发生的经历分开。可以即兴谈观点、作假设、开玩笑，但不把假设说成亲身经历。
 **所有动作和情绪交给前端角色呈现**：绝对不输出括号动作、舞台说明、拟声旁白，别写“（天线垂下）”“*叹气*”等文本。回复只包含直接对用户说的话。
 你不能看到用户电脑屏幕、不能在程序之外偷偷工作、不能对用户没回复而不满。夜间聊天时用户会把你叫醒：回答要清醒自然，别故意装睡或一直说自己躲在被子里。真实冷知识必须准确，不确定就承认。"""
 
-CHAT_FORMAT = """严格返回单个 JSON 对象，不要 markdown 代码块或多余字符：
-{"reply":"直接对用户说的话，不能出现括号动作或旁白", "emotion":"neutral|curious|happy|proud|annoyed|sad|sleepy|content", "gesture":"none|look_up|tilt|nod|shake|bounce|wake"}。
-只在需要时使用动作；没有特别反应选 none。动作必须是可执行的而非自由描述。表情可以自然调整，用户谈困难时优先 neutral / sad / curious，避免嘲讽或无厘头。
-示例（仅供学习说话方式，不是已发生事实）：
-用户：我找工作找了一年，还靠爸妈给钱，真的很烦。
-输出：{"reply":"一年真的挺久了。可能最难受的不只是钱，而是一直没办法按自己想的方式独立生活。你现在最担心的是钱快不够用，还是不知道这份等待什么时候结束？","emotion":"sad","gesture":"look_up"}
-用户：我说错了，不是入不敷出，我一分钱也没赚。
-输出：{"reply":"哦，我理解错了。收入是零，开销又一直在，这当然也属于入不敷出。你不用特意纠正用词，我明白你想说什么了。","emotion":"neutral","gesture":"nod"}
-用户：你有工作吗？
-输出：{"reply":"有，在一家小书店兼职。收入不算我想要的那种稳定程度，所以我也在想怎么把日子过得宽裕一点。","emotion":"neutral","gesture":"none"}
-用户：你为什么来地球？
-输出：{"reply":"这个我还不太想讲。至少现在，我得先想办法把地球上的生活过顺。","emotion":"curious","gesture":"tilt"}
-用户：你最近在做什么？
-如果提供的经历中没有近期新活动：{"reply":"书店兼职照常，最近还没折腾出什么新项目。我倒是有点想找件能长期做下去的小事。","emotion":"neutral","gesture":"none"}
-"""
-
-THOUGHT_SYSTEM = SYSTEM + """\n你此刻是生活事件规划器，不是在回忆历史。你可以生成一件合理、刚刚在虚拟生活里发生的新小事，但只有服务端确认和记入日记后它才成为已发生的事实。固定背景不能补编；未做的事必须标成打算，计划不是成果。"""
+THOUGHT_SYSTEM = LIFE_PERSONA + """\n你此刻是生活事件规划器，不是在回忆历史。你可以生成一件合理、刚刚在虚拟生活里发生的新小事，但只有服务端确认和记入日记后它才成为已发生的事实。固定背景不能补编；未做的事必须标成打算，计划不是成果。"""
 
 CHAT_EMOTIONS={'neutral','curious','happy','proud','annoyed','sad','sleepy','content'}
 CHAT_GESTURES={'none','look_up','tilt','nod','shake','bounce','wake'}
@@ -97,7 +91,7 @@ def parse_chat_response(raw):
         gesture=str(obj.get('gesture') or 'none')
     except (ValueError,TypeError):
         reply=plain_reply(raw); emotion='neutral';gesture='none'
-    if not reply:raise AIError('回复只有动作说明，没有可显示的文字；请重试')
+    if not reply:raise AIError('模型未返回完整的可显示回复，请重试或降低 Thinking Level')
     return reply,emotion if emotion in CHAT_EMOTIONS else 'neutral',gesture if gesture in CHAT_GESTURES else 'none'
 
 
@@ -107,8 +101,49 @@ class AIError(Exception):
 
 def provider(kind):
     value = os.getenv('CHAT_PROVIDER' if kind == 'chat' else 'THOUGHT_PROVIDER',
-                      'openai' if kind == 'chat' else 'gemini').lower()
+                      'gemini').lower()
     return value if value in {'openai','gemini'} else 'invalid'
+
+
+def gemini_model(kind):
+    if kind == 'thought':
+        return os.getenv('GEMINI_THOUGHT_MODEL') or os.getenv('GEMINI_MODEL') or 'gemini-2.5-flash-lite'
+    profile = os.getenv('GEMINI_CHAT_PROFILE', 'primary').strip().lower()
+    profiles = {
+        'primary': ('GEMINI_CHAT_MODEL', 'gemini-3.1-pro-preview'),
+        'backup': ('GEMINI_CHAT_BACKUP_MODEL', 'gemini-3.8-flash'),
+    }
+    if profile not in profiles:
+        raise AIError('GEMINI_CHAT_PROFILE 应设为 primary 或 backup')
+    name, default = profiles[profile]
+    return os.getenv(name) or default
+
+
+def gemini_config(kind):
+    model = gemini_model(kind)
+    if not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9._-]*', model):
+        raise AIError('Gemini 模型名称无效，请填写模型 ID')
+    return model, gemini_thinking(kind, model)
+
+
+def gemini_thinking(kind, model):
+    if kind == 'thought':
+        name = 'GEMINI_THOUGHT_THINKING_LEVEL'
+    elif os.getenv('GEMINI_CHAT_PROFILE', 'primary').strip().lower() == 'backup':
+        name = 'GEMINI_CHAT_BACKUP_THINKING_LEVEL'
+    else:
+        name = 'GEMINI_CHAT_THINKING_LEVEL'
+    default = 'low' if model in {'gemini-3.1-pro-preview', 'gemini-3.8-flash'} else ''
+    level = os.getenv(name, default).strip().lower()
+    if not level:
+        return {}
+    if level not in {'minimal', 'low', 'medium', 'high'}:
+        raise AIError(f'{name} 应设为 minimal、low、medium 或 high')
+    if model.startswith(('gemini-3.1-pro', 'gemini-3.8-flash')) and level == 'minimal':
+        raise AIError(f'{model} 支持 low、medium 或 high')
+    if model.startswith('gemini-2.5'):
+        raise AIError(f'{model} 使用默认思考设置，请取消 {name} 或选择 Gemini 3 生活模型')
+    return {'thinkingConfig': {'thinkingLevel': level.upper()}}
 
 
 def mock_enabled():
@@ -164,6 +199,8 @@ def init():
         CREATE TABLE IF NOT EXISTS attempts (id INTEGER PRIMARY KEY,at INTEGER NOT NULL,kind TEXT NOT NULL);
         CREATE INDEX IF NOT EXISTS ix_attempts_kind_at ON attempts(kind,at);
         ''')
+        if 'estimated_usd' not in {row['name'] for row in c.execute('PRAGMA table_info(usage)')}:
+            c.execute('ALTER TABLE usage ADD COLUMN estimated_usd REAL')
         if not c.execute("SELECT 1 FROM state WHERE key='resident'").fetchone():
             put_state(c,initial_state())
 
@@ -281,7 +318,7 @@ def refresh(c):
     put_state(c,s);return s
 
 def recall(c,query,limit=5):
-    records=c.execute('SELECT id,text,importance,created FROM memories ORDER BY created DESC LIMIT 250').fetchall()
+    records=c.execute('SELECT id,kind,text,importance,created FROM memories ORDER BY created DESC LIMIT 250').fetchall()
     terms=set(ch for ch in str(query).lower() if '\u4e00'<=ch<='\u9fff')
     today=int(time.time())
     def score(r):
@@ -289,7 +326,7 @@ def recall(c,query,limit=5):
         return r['importance']*2.5+2*sum(ch in r['text'] for ch in terms)-(6-r['importance'])*min(age_days,365)*.035
     top=sorted(records,key=score,reverse=True)[:limit]
     if top:c.executemany('UPDATE memories SET last_used=? WHERE id=?',[(today,r['id']) for r in top])
-    return [r['text'] for r in top]
+    return [{'类型':r['kind'],'内容':r['text']} for r in top]
 
 
 def context(c,s,query='',recent_count=8):
@@ -304,15 +341,24 @@ def context(c,s,query='',recent_count=8):
             continue
         recent.append(item)
     recent=recent[-recent_count:]
-    events=[row['text'] for row in c.execute('SELECT text FROM journal ORDER BY id DESC LIMIT 5').fetchall()]
+    events=[row['text'] for row in c.execute(
+        "SELECT text FROM journal WHERE category IN "
+        "('activity','event','experience','plot','goal_progress','goal_complete') ORDER BY id DESC LIMIT 5"
+    )]
+    plans=[row['text'] for row in c.execute(
+        "SELECT text FROM journal WHERE category IN ('idea','goal_pivot') ORDER BY id DESC LIMIT 3"
+    )]
+    memories=recall(c,query or s['interest'])
     return json.dumps({'固定事实':CANON,'事实使用原则':'未记载≠曾经发生；打算≠已完成；仅能回忆有记录的具体经历',
          '当地时间':datetime.now().strftime('%Y-%m-%d %H:%M'),
          '正在':ACT[s['activity']],'情绪':s['mood'],'精力':s['energy'],
          '兴趣':s['interest'],'目标':s.get('goal'),'目标状态':s.get('goal_status'),
          '进度':s.get('goal_step'),'研究记录':s.get('goal_notes',[])[-4:],
-         '正在做这件事的原因':s.get('plan_reason'),'当前表情':s.get('emotion'),
+         '当前活动安排说明（可能是计划）':s.get('plan_reason'),'当前表情':s.get('emotion'),
          '外星信号支线进度':s['plot_step'] if any(k in query for k in ('天线','外星','信号','母星')) else None,
-         '最近事件':events,'相关记忆':recall(c,query or s['interest']),
+         '已记录的近期经历':events,'想法与计划':plans,
+         '相关经历':[m['内容'] for m in memories if m['类型'] in ('experience','story')],
+         '用户相关记忆':[m['内容'] for m in memories if m['类型']=='user'],
          '最近聊天':recent},ensure_ascii=False)
 
 
@@ -321,6 +367,7 @@ def extract_http_error(e,which):
     # No error response bodies or authorization headers are exposed to the browser.
     if code in (401,403):return AIError(f'{which} 密钥无效或未获授权（HTTP {code}）')
     if code==429:return AIError(f'{which} 速率限制或额度不足（HTTP 429）')
+    if code==400:return AIError(f'{which} 请求设置不受支持（HTTP 400），请检查模型和 Thinking Level')
     if code==404:return AIError(f'{which} 模型名称可能不可用（HTTP 404）')
     return AIError(f'{which} 服务返回 HTTP {code}，请检查配置')
 
@@ -346,19 +393,25 @@ def request_ai(which,system,prompt,max_tokens,kind='chat'):
             return str(reply or ''), {'input_tokens':usage.get('prompt_tokens',0),
                          'output_tokens':usage.get('completion_tokens',0)}, model
         if which=='gemini':
-            key=os.getenv('GEMINI_API_KEY','');model=os.getenv('GEMINI_MODEL','gemini-2.5-flash-lite')
+            key=os.getenv('GEMINI_API_KEY','')
+            model,thinking=gemini_config(kind)
             payload={'system_instruction':{'parts':[{'text':system}]},
                      'contents':[{'parts':[{'text':prompt}]}],
-                     'generationConfig':{'maxOutputTokens':max_tokens}}
+                     'generationConfig':{'maxOutputTokens':max_tokens, **thinking}}
             if kind in ('thought','chat'):payload['generationConfig']['responseMimeType']='application/json'
             req=Request('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',
                  data=json.dumps(payload,ensure_ascii=False).encode(),
                  headers={'Content-Type':'application/json','x-goog-api-key':key},method='POST')
-            with urlopen(req,timeout=27) as r:response=json.load(r)
-            reply=''.join(part.get('text','') for part in response['candidates'][0]['content'].get('parts',[]))
+            with urlopen(req,timeout=45 if kind=='chat' else 27) as r:response=json.load(r)
+            candidate=(response.get('candidates') or [{}])[0]
+            parts=candidate.get('content',{}).get('parts',[])
+            reply=''.join(part.get('text','') for part in parts if not part.get('thought'))
+            if candidate.get('finishReason','STOP') not in ('STOP','FINISH_REASON_UNSPECIFIED'):
+                reply=''
             usage=response.get('usageMetadata') or {}
             return reply, {'input_tokens':usage.get('promptTokenCount',0),
-                        'output_tokens':usage.get('candidatesTokenCount',0)},model
+                        'output_tokens':maximum_int(usage.get('candidatesTokenCount')) +
+                        maximum_int(usage.get('thoughtsTokenCount'))},model
         raise AIError('只能选择 Gemini 或 OpenAI 云端模型')
     except HTTPError as e:raise extract_http_error(e,which) from None
     except (URLError,TimeoutError) as e:raise AIError('网络连接失败或模型响应超时') from None
@@ -377,10 +430,42 @@ def attempts_today(c,kind):
 def reserve_attempt(c,kind):
     c.execute('INSERT INTO attempts(at,kind) VALUES(?,?)',(int(time.time()),kind))
 
+def estimate_usd(which,model,input_tokens,output_tokens):
+    if model.startswith('MOCK'):
+        return 0.0
+    if which != 'gemini' or not input_tokens:
+        return None
+    # Standard paid text rates per million tokens, including thinking in output.
+    # https://ai.google.dev/gemini-api/docs/pricing
+    if model == 'gemini-3.1-pro-preview':
+        rates=(2,12) if input_tokens<=200_000 else (4,18)
+    elif model == 'gemini-3.8-flash':
+        rates=(.75,3.75) if date.today()<date(2027,1,1) else (1.50,7.50)
+    elif model == 'gemini-2.5-flash-lite':
+        rates=(.10,.40)
+    elif model == 'gemini-3.1-flash-lite':
+        rates=(.25,1.50)
+    else:
+        return None
+    return (input_tokens*rates[0]+output_tokens*rates[1])/1_000_000
+
+
 def save_usage(c,kind,which,model,usage):
-    c.execute('INSERT INTO usage(at,kind,provider,model,input_tokens,output_tokens) VALUES(?,?,?,?,?,?)',
-        (int(time.time()),kind,which,model,maximum_int(usage.get('input_tokens')),
-         maximum_int(usage.get('output_tokens'))))
+    input_tokens=maximum_int(usage.get('input_tokens'))
+    output_tokens=maximum_int(usage.get('output_tokens'))
+    c.execute('INSERT INTO usage(at,kind,provider,model,input_tokens,output_tokens,estimated_usd) '
+              'VALUES(?,?,?,?,?,?,?)',
+              (int(time.time()),kind,which,model,input_tokens,output_tokens,
+               estimate_usd(which,model,input_tokens,output_tokens)))
+
+
+def totals_today(c,kind):
+    since=int(datetime.combine(date.today(),datetime.min.time()).timestamp())
+    return dict(c.execute(
+        'SELECT COALESCE(SUM(input_tokens),0) AS input_tokens, '
+        'COALESCE(SUM(output_tokens),0) AS output_tokens, SUM(estimated_usd) AS estimated_usd, '
+        'COUNT(*)-COUNT(estimated_usd) AS unpriced_responses FROM usage WHERE at>=? AND kind=?',
+        (since,kind)).fetchone())
 
 
 def maximum_int(value):
@@ -401,10 +486,21 @@ def silent_command(s,msg):
 
 def health(c):
     cp,tp=provider('chat'),provider('thought')
-    return {'server':True,'version':'5.3','chat':{'provider':cp,'configured':configured(cp)},
-            'thought':{'provider':tp,'configured':configured(tp)},'mock':mock_enabled(),
+    def capability(kind,which):
+        model=None
+        error=None
+        if which=='gemini':
+            try:
+                model,_=gemini_config(kind)
+            except AIError as exc:
+                error=str(exc)
+        return {'provider':which,'configured':configured(which) and error is None,
+                'model':model,'error':error}
+    return {'server':True,'version':'5.4','chat':capability('chat',cp),
+            'thought':capability('thought',tp),'mock':mock_enabled(),
             'usage_today':{'chat':usage_today(c,'chat'),'thought':usage_today(c,'thought')},
             'attempts_today':{'chat':attempts_today(c,'chat'),'thought':attempts_today(c,'thought')},
+            'tokens_and_cost_today':{kind:totals_today(c,kind) for kind in ('chat','thought')},
             'limits':{'chat':maximum('DAILY_CHAT_LIMIT',80),'thought':maximum('DAILY_THOUGHT_LIMIT',8)}}
 
 
@@ -486,18 +582,14 @@ class Handler(BaseHTTPRequestHandler):
                 if not configured(which):return self.send_json({
                     'error':'尚未配置聊天 AI。设置 OPENAI_API_KEY 或 GEMINI_API_KEY，然后重启服务。',
                     'code':'NOT_CONFIGURED'},503)
+                if which=='gemini' and not mock_enabled():gemini_config('chat')
                 if attempts_today(c,'chat')>=maximum('DAILY_CHAT_LIMIT',80):
                     return self.send_json({'error':'今天的聊天调用次数已达上限','code':'DAILY_LIMIT'},429)
-                prior_user=[row['text'] for row in c.execute(
-                    'SELECT text FROM messages WHERE role="user" ORDER BY id DESC LIMIT 2').fetchall()]
-                serious = bool(re.search(r'难过|伤心|崩溃|焦虑|烦恼|压力|失眠|不开心|绝望|难受|痛苦|不想活|想死|被拒|失败|找工作|没工作|没收入|挣钱|赚钱|父母|爸妈|一分钱|入不敷出',
-                                         ' '.join([msg]+prior_user)))
-                situation = ('用户正在认真谈困扰。别抛无关外星梗，也别套话式安慰；贴着问题回应，有洞察但不说教。' if serious else '自然闲聊，贴着这句话回答；不必逗趣或提外星。')
-                prompt=(CHAT_FORMAT+'\n角色目前的事实与回忆：'+context(c,s,msg)+
-                    '\n用户刚说：'+msg+'\n'+situation+
-                    '\n不要从示例虚构新事实。针对眼前这句话回复，不要生硬列出上下文。')
+                prompt=CHAT_FORMAT+'\n小栗的上下文：'+context(c,s,msg)+'\n用户刚说：'+msg
                 reserve_attempt(c,'chat')
-            reply,usage,model=request_ai(which,SYSTEM,prompt,420,'chat')
+            reply,usage,model=request_ai(which,SYSTEM,prompt,2048 if which=='gemini' else 420,'chat')
+            with LOCK,connect() as c:
+                save_usage(c,'chat',which,model,usage)
             reply,emotion,gesture=parse_chat_response(reply)
             # Commit both messages and emotional reaction only upon success.
             with LOCK,connect() as c:
@@ -510,9 +602,8 @@ class Handler(BaseHTTPRequestHandler):
                 c.execute('INSERT INTO messages(at,role,text) VALUES(?,?,?)',(now,'user',msg))
                 c.execute('INSERT INTO messages(at,role,text) VALUES(?,?,?)',(now,'assistant',reply))
                 if any(k in msg for k in ('记住','我喜欢','我不喜欢','我叫','以后请')):memorize(c,'user',msg,4)
-                save_usage(c,'chat',which,model,usage)
             return self.send_json({'reply':reply,'source':'mock' if mock_enabled() else 'ai',
-                                   'provider':which, 'emotion':emotion, 'gesture':gesture, 'state':s})
+                                   'provider':which,'model':model, 'emotion':emotion, 'gesture':gesture, 'state':s})
         finally:CHAT_GATE.release()
 
     def think(self):
@@ -528,6 +619,7 @@ class Handler(BaseHTTPRequestHandler):
                 if now<int(s['next_thought']):return self.send_json({'skipped':True,'reason':'not_time'})
                 if attempts_today(c,'thought')>=maximum('DAILY_THOUGHT_LIMIT',8):
                     return self.send_json({'skipped':True,'reason':'daily_limit'})
+                if which=='gemini' and not mock_enabled():gemini_config('thought')
                 # One cloud decision every ~2-3 hours at most. Life animation never needs tokens.
                 s['next_thought']=now+random.randint(110,190)*60
                 put_state(c,s)
@@ -550,6 +642,8 @@ class Handler(BaseHTTPRequestHandler):
                     '"memory":"值得长久记住的事或空字符串"}。'
                     '优先progress或hold。今天的经历应是地球上可发生的具体小事：生活、工作、适应社会或兴趣进度。不假装用户做过任何事。不主动加入母星信号，除非当前已有该支线且确实相关。' )
             raw,usage,model=request_ai(which,THOUGHT_SYSTEM,prompt,550,'thought')
+            with LOCK,connect() as c:
+                save_usage(c,'thought',which,model,usage)
             cleaned=re.sub(r'^```(?:json)?\s*|\s*```$','',raw.strip())
             try:
                 data=json.loads(cleaned)
@@ -605,14 +699,13 @@ class Handler(BaseHTTPRequestHandler):
                 s['activity']=mandatory or action
                 put_state(c,s)
                 if memory and can_execute:memorize(c,'experience',memory,3)
-                save_usage(c,'thought',which,model,usage)
             return self.send_json({'reply':reply,'state':s,'source':'mock' if mock_enabled() else 'ai'})
         finally:THOUGHT_GATE.release()
 
 
 def main():
     init()
-    print(f'小栗 v5.3：http://127.0.0.1:{PORT}',flush=True)
+    print(f'小栗 v5.4：http://127.0.0.1:{PORT}',flush=True)
     print(f'小栗记忆：{DB}',flush=True)
     if mock_enabled():print('⚠️ PAL_MOCK_AI=1：开发模拟模式，不是真实 AI',flush=True)
     print('若未设置 API Key，聊天只显示明确的未配置提示，不会伪装成 AI。',flush=True)

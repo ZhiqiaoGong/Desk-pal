@@ -1,54 +1,40 @@
-# 小栗的角落 v5.3 — 自然对话与有依据的记忆
+# 小栗的角落 v5.4
 
-**v5.3 沿用 v5.2 的人物动作和长期数据库，不重置记忆。** 这版的重点是将“既定事实 / 未知背景 / 想法与计划 / 已发生经历”分开，让小栗不再为了回答问题临时编身世。她现在固定在**地球一家小书店兼职**；具体店名、收入、母星、家庭、来地球的原因都**未设定**。还没记录的经历不应被当作事实。
+小栗是在地球小书店兼职的像素女孩。她用更接近日常微信聊天的节奏回复，并用 SQLite 里的经历延续自己的生活。已记录的经历和想法分别提供给模型。旧对话只作为聊天上下文。
 
-## 更新内容
+## 在 Mac 上运行
 
-- 更真实的日常聊天风格：去傲娇、中二、频繁外星梗和机械安慰；认真倾诉时优先理解问题，不强行幽默。
-- “小栗的事实”与“她想做的事情”分开。聊天只能使用固定设定、当前状态、已记录的事件和目标；未知背景允许直接回避。旧版带括号、外星梗的助手回复保留在 SQLite，但会从**发送给模型的上下文中筛除部分典型示例**，减少模仿旧风格。
-- 语言和动作分离：模型请求返回 JSON 形式的 `reply / emotion / gesture`。聊天框只显示 `reply`；表情和小动作由前端呈现；可能仍出现不完美的模型输出，程序会过滤常见括号动作文字。**不能保证模型绝对不会编造事实**，这版加入了约束和防护，仍需要实际体验评估。
-- 聊天时如果她原本在睡觉，会短暂醒来交谈，不改真实时间作息。
-- 聊天输入框可自动扩展成多行（最多约五行，然后在框内滚动）；**Enter 发送、Shift+Enter 换行**，中文输入法组合输入时不会触发发送；长消息在历史中按原文换行。
-- 发色统一为自然栗棕色，去掉发顶的深色帽子感；保留既定长发、天线、做饭、散步、整体旋转的睡姿。
-- 延续每日 AI 请求次数限制和固定 SQLite 数据目录。
+1. 如果旧版正在运行，在那个 Terminal 里按 Control+C 停止服务。
+2. 在新版文件夹打开 Terminal，确保环境里已设置 `GEMINI_API_KEY`。如果原来在这个 Terminal 设置过，可以直接复用。
+3. 执行 `python3 server.py`，在 Chrome 打开 <http://127.0.0.1:8765>，点小栗聊天。
 
-## Mac 升级（建议用你之前已能成功使用的 Gemini）
+直接打开 `index.html` 可以离线试玩动作和预设回复。真实聊天使用本地 Python 服务。
 
-1. 解压 `desk_pal_v5_3.zip`。
-2. 在旧版运行的 Terminal 里按 **Control+C** 结束原服务。
-3. 新开 Terminal，输入 `cd `，然后将新版文件夹拖到 Terminal 后按回车。
-4. 如果是新开的 Terminal，需要重新配置 Gemini API Key（不要把 Key 发给别人或放在 HTML 里）。选择你已在 v5.2 成功使用的模型名称：
+## 切换模型
+
+| 用途 | 默认模型 ID | 模型覆盖变量 | Thinking Level 变量 |
+| --- | --- | --- | --- |
+| 默认聊天 | `gemini-3.1-pro-preview` | `GEMINI_CHAT_MODEL` | `GEMINI_CHAT_THINKING_LEVEL` |
+| 备用聊天 | `gemini-3.8-flash` | `GEMINI_CHAT_BACKUP_MODEL` | `GEMINI_CHAT_BACKUP_THINKING_LEVEL` |
+| 自主生活 | `gemini-2.5-flash-lite` | `GEMINI_THOUGHT_MODEL` | `GEMINI_THOUGHT_THINKING_LEVEL` |
+
+备用模型可在重启服务时手动切换，保留同一份聊天记录：
 
 ```bash
-export GEMINI_API_KEY='你的密钥'
-export GEMINI_MODEL='你已经成功使用的模型名称'
-export CHAT_PROVIDER=gemini
-export THOUGHT_PROVIDER=gemini
-python3 server.py
+GEMINI_CHAT_PROFILE=backup python3 server.py
 ```
 
-5. 在 Chrome 打开 **http://127.0.0.1:8765**，点击小栗开始对话。**不要用 ChatGPT 内置 HTML 预览测试按钮交互。**
+3.1 Pro 和 3.8 Flash 默认使用最低的 `low`，也可设为 `medium` 或 `high`。2.5 Flash-Lite 保持默认设置（思考关闭）。若要给生活模型设置 Thinking Level，可以将生活模型切换到支持该参数的 Gemini 3 型号。旧的 `GEMINI_MODEL` 仍可作为生活模型的兼容配置。模型和 Thinking Level 以 [Google 官方文档](https://ai.google.dev/gemini-api/docs/generate-content/thinking) 为准。
 
-如果还在旧 Terminal 且环境变量已经设置，通常只需进入新版目录并运行 `python3 server.py`。
+## 记忆和费用
 
-### 记忆与隐私
+Mac 默认继续读取 `~/Library/Application Support/ChestnutPal/chestnut.sqlite3`。如果设置了 `PAL_DB`，服务使用指定文件。SQLite 中会保留现有聊天、经历和目标，并给用量表添加费用估算列。实际调用时，聊天上下文会发送给所配置的云端模型。
 
-Mac 数据库默认在：
+打开 <http://127.0.0.1:8765/api/health> 可查看聊天与自主生活各自的今日请求数、返回数、输入与输出 token，以及按 [Gemini 标准文本费率](https://ai.google.dev/gemini-api/docs/pricing) 计算的美元估算。输出统计包含 Gemini 返回的思考 token。旧用量、未知费率和缺少用量的响应会计入 `unpriced_responses`。实际账单还受免费额度和计费方案影响，Google AI Pro 订阅与 API 计费独立。
 
-`~/Library/Application Support/ChestnutPal/chestnut.sqlite3`
+默认每日聊天和自主生活请求上限分别是 80 和 8，可通过 `DAILY_CHAT_LIMIT` 与 `DAILY_THOUGHT_LIMIT` 调整。失败的请求也占用次数；备用模型需手动切换。
 
-**v5.2 → v5.3 使用同一份数据库。** 程序不会自动删除旧消息，既有目标和经历仍在。升级前可以先退出服务，然后用 Finder 复制这份数据库做备份。数据库只保存到本机；相关上下文会在实际 AI 请求时发送给你配置的云端模型。若此前设置了 `PAL_DB`，仍以它指定的路径为准。旧版 v5.0/v5.1 中的数据库不会被自动导入。
-
-### 运行模式
-
-- 直接打开 `index.html`：离线试玩，可以演示人物动作，但回答是预设文字，不是真正的 AI。
-- 通过 Python 服务：在浏览器与本地服务连接后，才会请求真实 API。
-- 人物的生活是虚拟模拟；她不会真正去实体书店工作，也无法访问你的屏幕或麦克风。
-- 默认每天最多 80 次聊天请求、8 次自主思考请求。上限是次数，不是美元上限。
-
-## 测试情况
-
-无需 API Key 的回归测试：
+## 验证
 
 ```bash
 python3 test_server.py
@@ -58,6 +44,11 @@ python3 test_api_protocol.py
 node test_interaction.cjs
 ```
 
-`test_browser.py`、`test_ui_v53.py`、`test_visual.py`、`test_emotions.py` 使用 Playwright/Chromium，面向有开发环境的用户。已检查模拟 AI 情绪动作、离线回复、输入框多行、Enter/Shift+Enter、数据库与缓存隔离、跨天生活。
+真实试聊可先用临时记忆库，让验收对话和原来的记录各自保留。下面的启动方式同时关闭自动生活调用，便于控制试聊用量：
 
-**尚未完成**：在本环境使用你自己的 Gemini API Key 做端到端真实对话测试，或对几十轮真实模型回复做量化风格评测。由于模型生成存在不确定性，“不编造经历”仍需要对真实对话继续观察和完善。
+```bash
+trial_dir="$(mktemp -d)"
+PAL_DB="$trial_dir/chestnut.sqlite3" DAILY_CHAT_LIMIT=12 DAILY_THOUGHT_LIMIT=0 PORT=8766 python3 server.py
+```
+
+打开 <http://127.0.0.1:8766>。先聊一段认真话题，例如找工作很久、还要靠家里，然后突然切到日常闲聊。接着问小栗有没有也向父母要过钱、在哪工作、最近做完了什么。观察她是否自然跟上话题、少做例行反问，以及是否把假设或计划说成真的。重启时可用同一份临时数据库切换到备用模型继续试聊。

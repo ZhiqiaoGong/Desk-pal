@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>小栗的角落 · v5.3</title>
+<title>小栗的角落 · v5.4</title>
 <style>
 :root { color-scheme: light; font-family: -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; color:#544558; }
 *{box-sizing:border-box} html,body{margin:0;min-height:100%;height:100%;}
@@ -106,13 +106,13 @@ async function pullState(){
    const data=await res.json();
    state=data.state;serverConnected=true;
    const caps=data.capabilities||{};
-   if(caps.version!=='5.3'){
+   if(caps.version!=='5.4'){
      chatReady=false;thoughtReady=false;simulated=false;
-     setStatus('当前仍连接旧版小栗服务。请停止旧服务，再启动 v5.3');showTime();return;
+     setStatus('当前仍连接旧版小栗服务。请停止旧服务，再启动 v5.4');showTime();return;
    }
    chatReady=!!caps.chat?.configured;
    thoughtReady=!!caps.thought?.configured;simulated=!!caps.mock;
-   if(!sending)setStatus(connectionStatus());
+   if(!sending)setStatus(caps.chat?.error || connectionStatus());
    if(!loadedHistory&&!sending){
      history=(data.history||[]).map(x=>({role:x.role,content:x.text}));loadedHistory=true;
      if(chatOpen){$('history').replaceChildren();history.slice(-24).forEach(x=>add(x.role,x.content));}
@@ -161,7 +161,7 @@ async function submit(ev){
  try{
    const res=await fetch('/api/chat',{
        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg}),
-       signal:AbortSignal.timeout(34000)});
+       signal:AbortSignal.timeout(52000)});
    const data=await res.json();if(!res.ok)throw new Error(data.error||'云端模型连接失败');
    const reply=data.reply||'';if(!reply)throw new Error('模型没有返回文字');
    add('assistant',reply);react(data);

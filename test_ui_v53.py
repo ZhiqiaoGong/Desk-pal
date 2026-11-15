@@ -27,7 +27,7 @@ with sync_playwright() as p:
       window.fakeMessages=[];
       window.fetch=async(url, opts={})=> {
         if(url==='/api/state')return {ok:true,json:async()=>({state:{activity:'sleep',mood:.6,emotion:'sleepy',interest:'观察街头日常',energy:.4,signal:false},
-          history:window.fakeMessages,capabilities:{version:'5.3',chat:{configured:true},thought:{configured:false},mock:true}})};
+          history:window.fakeMessages,capabilities:{version:'5.4',chat:{configured:true},thought:{configured:false},mock:true}})};
         if(url==='/api/chat'){
           let user=JSON.parse(opts.body).message;
           let reply='我在小书店兼职。';
