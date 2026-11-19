@@ -5,7 +5,7 @@ from datetime import datetime as TrueDateTime
 from http.server import ThreadingHTTPServer
 from urllib.request import Request,urlopen
 from unittest.mock import patch
-HERE=Path(__file__).resolve().parent
+HERE=Path(__file__).resolve().parent.parent
 sp=importlib.util.spec_from_file_location('palv51',HERE/'server.py')
 pal=importlib.util.module_from_spec(sp);sp.loader.exec_module(pal)
 class Saturday(TrueDateTime):

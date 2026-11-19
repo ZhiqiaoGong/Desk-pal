@@ -1,7 +1,7 @@
 """Browser UI test without actual loopback network (restricted in sandbox)."""
 from pathlib import Path
 from playwright.sync_api import sync_playwright
-HERE=Path(__file__).resolve().parent
+HERE=Path(__file__).resolve().parent.parent
 html=(HERE/'index.html').read_text()
 with sync_playwright() as p:
     browser=p.chromium.launch(headless=True,executable_path='/usr/bin/chromium',
@@ -59,5 +59,5 @@ with sync_playwright() as p:
     print('PASS browser: conversation restored from backend history')
     assert not errors,errors
     page.locator('#close').click()
-    page.locator('#avatar').screenshot(path=str(HERE/'preview_character.png'),animations='disabled')
+    page.locator('#avatar').screenshot(path=str(HERE/'previews'/'preview_character.png'),animations='disabled')
     browser.close()

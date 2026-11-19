@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const html = fs.readFileSync(__dirname+'/index.html','utf8');
+const html = fs.readFileSync(__dirname+'/../index.html','utf8');
 const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 class Element {
  constructor(id){this.id=id;this.style={};this.value='';this.disabled=false;this.children=[];this.handlers={};this.classList={values:new Set(id==='chat'||id==='bubble'?['hidden']:[]),contains(x){return this.values.has(x)},add(x){this.values.add(x)},remove(x){this.values.delete(x)}};this.textContent='';this.scrollHeight=0;this.scrollTop=0;}

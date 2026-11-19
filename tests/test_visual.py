@@ -2,7 +2,7 @@ from playwright.sync_api import sync_playwright
 from pathlib import Path
 from PIL import Image,ImageOps,ImageDraw,ImageFont
 import time
-here=Path(__file__).parent
+here=Path(__file__).resolve().parent.parent
 outputs=[]
 with sync_playwright() as p:
  browser=p.chromium.launch(headless=True, executable_path='/usr/bin/chromium', args=['--disable-dev-shm-usage','--no-sandbox','--disable-gpu'])
@@ -18,7 +18,7 @@ with sync_playwright() as p:
   assert '演示' in page.locator('#history').inner_text()
   page.locator('#close').click()
   page.wait_for_timeout(300)
-  dest=here / f'preview_{ {"站立":"idle","散步":"walk","做饭":"cook","睡觉":"sleep"}[action]}.png'
+  dest=here / 'previews' / f'preview_{ {"站立":"idle","散步":"walk","做饭":"cook","睡觉":"sleep"}[action]}.png'
   page.locator('#avatar').screenshot(path=str(dest), animations='disabled')
   outputs.append((action,dest))
   page.wait_for_timeout(1000)
@@ -38,5 +38,5 @@ for name,path in outputs:
 montage=Image.new('RGB',(sum(i.width for i in items),max(i.height for i in items)),'#ffffff')
 x=0
 for im in items:montage.paste(im,(x,0));x+=im.width
-montage.save(here/'preview_all.png')
+montage.save(here/'previews'/'preview_all.png')
 print('visual screenshots saved, no page errors')

@@ -10,7 +10,7 @@ from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-HERE=Path(__file__).resolve().parent
+HERE=Path(__file__).resolve().parent.parent
 spec=importlib.util.spec_from_file_location('chestnut_server',HERE/'server.py')
 pal=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pal)

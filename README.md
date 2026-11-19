@@ -65,11 +65,11 @@ Mac 默认继续读取 `~/Library/Application Support/ChestnutPal/chestnut.sqlit
 ## 验证
 
 ```bash
-python3 test_server.py
-python3 test_grounded_chat.py
-python3 test_life.py
-python3 test_api_protocol.py
-node test_interaction.cjs
+python3 tests/test_server.py
+python3 tests/test_grounded_chat.py
+python3 tests/test_life.py
+python3 tests/test_api_protocol.py
+node tests/test_interaction.cjs
 ```
 
 真实试聊可先用临时记忆库，让验收对话和原来的记录各自保留。下面的启动方式同时关闭自动生活调用，便于控制试聊用量：
@@ -80,3 +80,20 @@ PAL_DB="$trial_dir/chestnut.sqlite3" DAILY_CHAT_LIMIT=12 DAILY_THOUGHT_LIMIT=0 P
 ```
 
 打开 <http://127.0.0.1:8766>。先聊一段认真话题，例如找工作很久、还要靠家里，然后突然切到日常闲聊。接着问小栗有没有也向父母要过钱、在哪工作、最近做完了什么。观察她是否自然跟上话题、少做例行反问，以及是否把假设或计划说成真的。重启时可用同一份临时数据库切换到备用模型继续试聊。
+
+## 项目目录
+
+```text
+deskpal/
+├── 启动小栗.command   # Mac 双击启动入口
+├── server.py          # 本地服务、模型调用和 SQLite 记忆
+├── index.html         # 聊天界面及角色绘制
+├── README.md
+├── tests/             # 后端、交互和视觉测试
+├── previews/          # 已保存的角色及界面预览图
+└── .backups/          # 本机备份，Git 忽略
+```
+
+预览图包含早期版本的截图，供参考；视觉测试运行后会更新对应图片。视觉测试需要额外安装 Playwright 及浏览器，部分脚本仍使用 Linux Chromium 路径。常规回归测试命令见上方“验证”。
+
+日常记忆和 API Key 存在 Mac 的 Application Support 目录中。

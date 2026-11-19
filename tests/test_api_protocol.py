@@ -2,7 +2,7 @@
 import importlib.util,json,os
 from pathlib import Path
 from unittest.mock import patch
-spec=importlib.util.spec_from_file_location('pal',Path(__file__).parent/'server.py')
+spec=importlib.util.spec_from_file_location('pal',Path(__file__).resolve().parent.parent/'server.py')
 pal=importlib.util.module_from_spec(spec);spec.loader.exec_module(pal)
 class FakeResponse:
  def __init__(self,body):self.body=body

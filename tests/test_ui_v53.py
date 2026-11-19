@@ -1,6 +1,6 @@
 from pathlib import Path
 from playwright.sync_api import sync_playwright
-root=Path(__file__).parent
+root=Path(__file__).resolve().parent.parent
 html=(root/'index.html').read_text()
 with sync_playwright() as p:
     browser=p.chromium.launch(headless=True,executable_path='/usr/bin/chromium',args=['--no-sandbox','--disable-dev-shm-usage','--disable-gpu'])
@@ -12,7 +12,7 @@ with sync_playwright() as p:
     page.locator('#message').fill('这是一个比较长的消息，想看看输入框会不会逐行长高。'*9)
     h=page.locator('#message').evaluate('(el)=>el.getBoundingClientRect().height')
     assert 48<h<=112,h
-    page.locator('#chat').screenshot(path=str(root/'preview_chat_multiline.png'),animations='disabled')
+    page.locator('#chat').screenshot(path=str(root/'previews'/'preview_chat_multiline.png'),animations='disabled')
     # Shift+Enter creates a linebreak, not a chat submission
     page.locator('#message').fill('第一行');page.locator('#message').press('Shift+Enter')
     page.locator('#message').type('第二行')
@@ -43,7 +43,7 @@ with sync_playwright() as p:
     page.wait_for_function("() => document.querySelector('#status').textContent.includes('开发模拟回复')")
     assert '我在小书店兼职' in page.locator('#history').inner_text()
     assert '天线' not in page.locator('#history').inner_text() or True
-    page.locator('#chat').screenshot(path=str(root/'preview_chat_reply.png'),animations='disabled')
+    page.locator('#chat').screenshot(path=str(root/'previews'/'preview_chat_reply.png'),animations='disabled')
     assert not errors,errors
     print('PASS multiline > one row, shift+enter newline, enter submit, long chat preserved, simulated AI emotion response, sleep/wake')
     browser.close()

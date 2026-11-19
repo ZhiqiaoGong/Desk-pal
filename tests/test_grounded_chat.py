@@ -9,7 +9,7 @@ from pathlib import Path
 from http.server import ThreadingHTTPServer
 from urllib.request import Request, urlopen
 
-spec=importlib.util.spec_from_file_location('pal',Path(__file__).parent/'server.py')
+spec=importlib.util.spec_from_file_location('pal',Path(__file__).resolve().parent.parent/'server.py')
 pal=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pal)
 assert pal.CANON['employment'].find('小书店')>=0
