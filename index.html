@@ -16,6 +16,15 @@ body{background:radial-gradient(ellipse at 75% 75%,#f2e5f1 0,transparent 48%),ra
 .bubble:after{content:"";position:absolute;right:48px;bottom:-7px;width:12px;height:12px;background:#fffdfb;transform:rotate(45deg);border-right:1px solid #ece0eb;border-bottom:1px solid #ece0eb}
 .bubble .tiny{font-size:10px;color:#ae9baa;letter-spacing:.08em;margin-bottom:4px}
 .chat{position:absolute;bottom:269px;right:0;width:315px;background:#fffcfc;border:1px solid #eadcea;border-radius:20px;padding:12px;box-shadow:0 16px 38px #5b486327;z-index:8;animation:enter .2s ease}
+.chat.expanded{position:fixed;right:18px;bottom:18px;width:min(640px,calc(100vw - 36px));height:min(720px,calc(100dvh - 36px));display:flex;flex-direction:column;padding:18px}
+.chat.expanded .history{flex:1;min-height:0;height:auto;padding:10px 4px 16px;gap:14px}
+.chat.expanded .date-divider{align-self:center;font-size:11px;color:#9a8ea0;padding:8px}
+.history-tools{display:flex;justify-content:center;gap:12px}.history-tools button{border:0;background:none;color:#826d98;font-size:12px;cursor:pointer;padding:5px}
+.line{font-size:14px;max-width:85%;line-height:1.75}
+.chat.expanded .entry textarea{font-size:14px}
+.chat.expanded .chat-head{font-size:14px}
+.chat-actions{display:flex;gap:4px}
+.chat-head button:focus-visible{outline:2px solid #a890b3;border-radius:6px}
 .chat-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-left:5px;font-size:12px;font-weight:600}
 .chat-head button{border:0;background:none;font-size:21px;color:#95889a;cursor:pointer;width:30px;height:30px}
 .history{height:210px;overflow:auto;display:flex;flex-direction:column;gap:9px;padding:5px 3px 8px;overscroll-behavior:contain;user-select:text}
@@ -35,7 +44,8 @@ body{background:radial-gradient(ellipse at 75% 75%,#f2e5f1 0,transparent 48%),ra
  <div class="ground"></div>
  <div class="bubble hidden" id="bubble" role="status"><div class="tiny" id="bubble-label">小栗的碎碎念</div><div id="bubble-text"></div></div>
  <div class="chat hidden" id="chat">
-  <div class="chat-head"><span>和小栗说说话</span><button id="close" type="button" aria-label="关闭聊天">×</button></div>
+  <div class="chat-head"><span>和小栗说说话</span><div class="chat-actions"><button id="chat-size" type="button" aria-label="放大聊天窗口" title="放大聊天窗口" aria-pressed="false">⤢</button><button id="close" type="button" aria-label="关闭聊天">×</button></div></div>
+  <div class="history-tools"><button id="older" type="button" class="hidden">加载失败，点击重试</button><button id="latest" type="button" class="hidden">回到最新消息 ↓</button></div>
   <div class="history" id="history" aria-live="polite"></div>
   <form class="entry" id="form"><textarea id="message" aria-label="给小栗发消息" autocomplete="off" maxlength="600" rows="1" placeholder="说点什么…"></textarea><button id="send" type="submit">发送</button></form>
   <div class="status" id="status">正在看看今天做什么…</div>
@@ -64,9 +74,87 @@ function offlineTick(){let d=NOW().toLocaleDateString('en-CA');if(demo.date!==d)
 function setStatus(s){$('status').textContent=s}
 function showTime(){const date=NOW();$('dayline').textContent=new Intl.DateTimeFormat('zh-CN',{hour:'2-digit',minute:'2-digit'}).format(date)+' · '+(ACT[state.activity]||'发呆');}
 function speak(text,label='小栗的碎碎念'){if(chatOpen||Date.now()<offlineQuietUntil||NOW().getHours()<8||NOW().getHours()>=23)return;$('bubble-text').textContent=text;$('bubble-label').textContent=label;$('bubble').classList.remove('hidden');clearTimeout(bubbleTimer);bubbleTimer=setTimeout(()=>$('bubble').classList.add('hidden'),14000)}
-function add(role,text){const item=document.createElement('div');item.className='line'+(role==='user'?' user':role==='notice'?' notice':'');item.textContent=text;$('history').appendChild(item);$('history').scrollTop=$('history').scrollHeight;return item;}
-function showChat(){if(chatOpen)return;chatOpen=true;$('bubble').classList.add('hidden');$('chat').classList.remove('hidden');$('history').replaceChildren();history.slice(-24).forEach(x=>add(x.role,x.content));if(!history.length)add('assistant','你来啦。我刚才在'+(ACT[state.activity]||'发呆')+'。');$('message').focus();}
+let oldestId=null,hasOlder=false,loadingOlder=false;
+function dateLabel(at){
+  return new Date(at*1000).toLocaleDateString('zh-CN');
+}
+function add(role,text,at=Date.now()/1000){
+  const list=$('history');
+  const follow=list.scrollHeight-list.clientHeight-list.scrollTop<=8;
+  const day=dateLabel(at);
+  if(list.lastDay!==day){
+    const divider=document.createElement('div');divider.className='date-divider';
+    divider.textContent=day;list.appendChild(divider);list.lastDay=day;
+  }
+  const item=document.createElement('div');
+  item.className='line'+(role==='user'?' user':role==='notice'?' notice':'');
+  item.textContent=text;list.appendChild(item);
+  if(follow)list.scrollTop=list.scrollHeight;
+  else $('latest').classList.remove('hidden');
+  return item;
+}
+function renderHistory(){
+  const list=$('history');list.replaceChildren();list.lastDay=null;
+  history.forEach(x=>add(x.role,x.content,x.at));
+  list.scrollTop=list.scrollHeight;$('latest').classList.add('hidden');
+}
+async function loadOlder(){
+  if(!hasOlder||loadingOlder||sending||!oldestId)return;
+  loadingOlder=true;$('older').classList.add('hidden');
+  try{
+    const res=await fetch('/api/history?before='+oldestId,{cache:'no-store',signal:AbortSignal.timeout(10000)});
+    if(!res.ok)throw new Error();
+    const data=await res.json();
+    const list=$('history');
+    const anchor=Array.from(list.children).find(x=>x.className!=='date-divider');
+    const oldTop=anchor?anchor.getBoundingClientRect().top:0;
+    const saved=Array.from(list.children);
+    const lastDay=list.lastDay;
+    const rows=data.history||[];
+    list.replaceChildren();list.lastDay=null;
+    rows.forEach(x=>add(x.role,x.text,x.at));
+    if(saved[0]?.className==='date-divider'&&saved[0].textContent===list.lastDay)saved.shift();
+    saved.forEach(x=>list.appendChild(x));list.lastDay=lastDay;
+    if(anchor)list.scrollTop+=anchor.getBoundingClientRect().top-oldTop;
+    history=rows.map(x=>({id:x.id,at:x.at,role:x.role,content:x.text})).concat(history);
+    if(rows.length)oldestId=rows[0].id;
+    hasOlder=!!data.has_more;
+
+  }catch{
+    $('older').classList.remove('hidden');
+  }finally{loadingOlder=false;}
+}
+$('older').addEventListener('click',loadOlder);
+$('history').addEventListener('scroll',()=>{
+  const list=$('history');
+  if(list.scrollTop<=24)loadOlder();
+  if(list.scrollHeight-list.clientHeight-list.scrollTop<=8)$('latest').classList.add('hidden');
+});
+$('latest').addEventListener('click',()=>{
+  $('history').scrollTop=$('history').scrollHeight;$('latest').classList.add('hidden');
+});
+function showChat(){if(chatOpen)return;chatOpen=true;$('bubble').classList.add('hidden');$('chat').classList.remove('hidden');renderHistory();if(!history.length)add('assistant','你来啦。我刚才在'+(ACT[state.activity]||'发呆')+'。');$('message').focus();}
 function hideChat(){chatOpen=false;$('chat').classList.add('hidden');}
+function toggleChatSize(){
+  const list=$('history');
+  const atBottom=list.scrollHeight-list.clientHeight-list.scrollTop<=8;
+  const top=list.getBoundingClientRect().top;
+  const anchor=Array.from(list.children).find(item=>item.getBoundingClientRect().bottom>top);
+  const offset=anchor?anchor.getBoundingClientRect().top-top:0;
+  const expanded=!$('chat').classList.contains('expanded');
+  if(expanded)$('chat').classList.add('expanded');
+  else $('chat').classList.remove('expanded');
+  const button=$('chat-size');
+  const label=expanded?'缩小聊天窗口':'放大聊天窗口';
+  button.textContent=expanded?'⤡':'⤢';
+  button.setAttribute('aria-label',label);
+  button.setAttribute('aria-pressed',String(expanded));
+  button.title=label;
+  resizeMessage();
+  if(atBottom)list.scrollTop=list.scrollHeight;
+  else if(anchor)list.scrollTop+=anchor.getBoundingClientRect().top-list.getBoundingClientRect().top-offset;
+}
+$('chat-size').addEventListener('click',toggleChatSize);
 function resizeMessage(){
   const el=$('message');el.style.height='40px';
   el.style.height=Math.min(112,Math.max(40,el.scrollHeight))+'px';
@@ -114,8 +202,10 @@ async function pullState(){
    thoughtReady=!!caps.thought?.configured;simulated=!!caps.mock;
    if(!sending)setStatus(caps.chat?.error || connectionStatus());
    if(!loadedHistory&&!sending){
-     history=(data.history||[]).map(x=>({role:x.role,content:x.text}));loadedHistory=true;
-     if(chatOpen){$('history').replaceChildren();history.slice(-24).forEach(x=>add(x.role,x.content));}
+     history=(data.history||[]).map(x=>({id:x.id,at:x.at,role:x.role,content:x.text}));loadedHistory=true;
+     oldestId=history[0]?.id;hasOlder=!!data.has_more;
+     $('older').classList.add('hidden');
+     if(chatOpen)renderHistory();
    }
  }catch{serverConnected=false;chatReady=false;thoughtReady=false;simulated=false;
    offlineTick();if(!sending)setStatus(connectionStatus());}
@@ -147,7 +237,7 @@ async function submit(ev){
    const reply=offlineReply(msg);
    add('user',msg);add('assistant','[离线预设] '+reply);
    history.push({role:'user',content:msg},{role:'assistant',content:'[离线预设] '+reply});
-   history=history.slice(-30);demo.history=history;save();
+   demo.history=history.slice(-30);save();
    setStatus(connectionStatus());$('message').focus();return;
  }
  if(!chatReady){
@@ -165,8 +255,8 @@ async function submit(ev){
    const data=await res.json();if(!res.ok)throw new Error(data.error||'云端模型连接失败');
    const reply=data.reply||'';if(!reply)throw new Error('模型没有返回文字');
    add('assistant',reply);react(data);
-   history.push({role:'user',content:msg},{role:'assistant',content:reply});
-   history=history.slice(-30);demo.history=history;save();
+   history.push({role:'user',content:msg,at:Date.now()/1000},{role:'assistant',content:reply,at:Date.now()/1000});
+   demo.history=history.slice(-30);save();
    setStatus(data.source==='mock'?'开发模拟回复 · 非真实 AI':data.source==='local'?'本地指令已执行':'真实 AI 回复成功');
  }catch(err){
    outgoing.remove();

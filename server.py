@@ -19,6 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+from urllib.parse import urlsplit, parse_qs
 
 ROOT = Path(__file__).resolve().parent
 # v5.2 is a deliberate new beginning. Do NOT import old version-folder databases.
@@ -553,11 +554,24 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Content-Length',str(len(data)))
             self.send_header('X-Content-Type-Options','nosniff')
             self.end_headers();self.wfile.write(data);return
+        if urlsplit(self.path).path=='/api/history':
+            query=parse_qs(urlsplit(self.path).query)
+            try:
+                before=int(query.get('before',['0'])[0])
+                if before<=0:raise ValueError()
+            except ValueError:
+                return self.send_json({'error':'无效的历史记录位置'},400)
+            with LOCK,connect() as c:
+                rows=c.execute('SELECT id,at,role,text FROM messages WHERE id<? ORDER BY id DESC LIMIT 41',
+                               (before,)).fetchall()
+                self.send_json({'history':[display_message(row) for row in reversed(rows[:40])],
+                                'has_more':len(rows)>40})
+            return
         if self.path=='/api/state':
             with LOCK,connect() as c:
                 s=refresh(c)
-                rows=c.execute('SELECT id,role,text FROM messages ORDER BY id DESC LIMIT 24').fetchall()
-                self.send_json({'state':s,'history':[display_message(row) for row in reversed(rows)], 'capabilities':health(c)})
+                rows=c.execute('SELECT id,at,role,text FROM messages ORDER BY id DESC LIMIT 25').fetchall()
+                self.send_json({'state':s,'history':[display_message(row) for row in reversed(rows[:24])], 'has_more':len(rows)>24, 'capabilities':health(c)})
             return
         if self.path=='/api/health':
             with LOCK,connect() as c:self.send_json(health(c))

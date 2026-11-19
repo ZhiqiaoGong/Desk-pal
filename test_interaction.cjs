@@ -5,7 +5,9 @@ const vm = require('node:vm');
 const html = fs.readFileSync(__dirname+'/index.html','utf8');
 const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 class Element {
- constructor(id){this.id=id;this.style={};this.value='';this.disabled=false;this.children=[];this.handlers={};this.classList={values:new Set(id==='chat'||id==='bubble'?['hidden']:[]),add(x){this.values.add(x)},remove(x){this.values.delete(x)}};this.textContent='';this.scrollHeight=0;this.scrollTop=0;}
+ constructor(id){this.id=id;this.style={};this.value='';this.disabled=false;this.children=[];this.handlers={};this.classList={values:new Set(id==='chat'||id==='bubble'?['hidden']:[]),contains(x){return this.values.has(x)},add(x){this.values.add(x)},remove(x){this.values.delete(x)}};this.textContent='';this.scrollHeight=0;this.scrollTop=0;}
+ setAttribute(name,value){this[name]=value;}
+ getBoundingClientRect(){return {top:0,bottom:20};}
  addEventListener(t,cb){this.handlers[t]=cb;}
  appendChild(el){this.children.push(el);this.scrollHeight=this.children.length;}
  replaceChildren(){this.children=[];}
@@ -23,6 +25,18 @@ const sandbox={document:doc,location:{protocol:'file:',hostname:''},localStorage
 vm.runInNewContext(script.replace('start();', "globalThis.testDraw=()=>draw(0);globalThis.testWake=()=>{demoUntil=0;state.activity='sleep';draw(0)};start();"),sandbox,{timeout:5000});
 (async()=>{
  get('avatar').fire('click');assert(!get('chat').classList.values.has('hidden'));
+ get('message').value='还没写完的消息';
+ get('history').clientHeight=200;
+ const messagesBefore=get('history').children.slice();
+ get('chat-size').fire('click');
+ assert(get('chat').classList.contains('expanded'));
+ assert.equal(get('chat-size')['aria-pressed'],'true');
+ assert.equal(get('message').value,'还没写完的消息');
+ assert.deepEqual(get('history').children,messagesBefore);
+ get('chat-size').fire('click');
+ assert(!get('chat').classList.contains('expanded'));
+ assert.equal(get('chat-size')['aria-pressed'],'false');
+ assert.equal(get('message').value,'还没写完的消息');
  get('message').value='你好';await get('form').fire('submit');
  assert(get('history').children.some(x=>x.textContent==='你好'));
  assert(get('history').children.length>=3);
