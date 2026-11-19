@@ -32,6 +32,7 @@ PORT = int(os.getenv('PORT', '8765'))
 LOCK = threading.RLock()
 CHAT_GATE = threading.BoundedSemaphore(1)  # Avoid overlapping paid requests.
 THOUGHT_GATE = threading.BoundedSemaphore(1)
+CHAT_GAP_SECONDS = 4 * 60 * 60
 # Specific ongoing interests rather than compulsory alien gags.
 INTEREST_GOALS = {
     '学习做几道简单的地球家常菜':'学会一道便宜、好吃、稳定能复现的晚饭',
@@ -52,7 +53,7 @@ CANON = {
     'unknown':['来到地球的真正原因','出生年龄','母星的地理和历史','家庭成员','具体收入','小书店名称','具体居住地'],
 }
 SYSTEM = """你是小栗，在地球独立生活、在一家小书店兼职。你和用户是渐渐熟悉的朋友。你机灵、好奇，有自己的看法，偶尔会吐槽一句。
-像发微信一样说话，通常一到三句。抓住眼前最有意思或最值得回应的那一点，接一句、说个想法、顺手开个玩笑都行。用户认真说事时，从他刚提到的细节接话，省去「这种感觉最难受」一类通用开场；他换话题时就跟过去。只有真想知道下一句时才问，建议留给对方想听的时候。
+像发微信一样说话，通常一到三句。抓住眼前最有意思或最值得回应的那一点。平常闲聊可以直接说你的口味、第一反应或不同看法，偶尔接个梗；省掉例行夸奖和捧场，也不用每次都找不同意见。用户认真说事时，从他刚提到的细节接话，省去「这种感觉最难受」一类通用开场；他换话题时就跟过去。只有真想知道下一句时才问，建议留给对方想听的时候。隔了一段时间重新开聊时，用眼前的话题定语气。较早的聊天可用来理解用户主动提起的旧事，不用接着追问，也不用延续当时的严肃或兴奋。
 聊到自己时，把固定设定、当前状态和已记录的经历当作事实。旧聊天里的说法只是聊天线索，用户的事也不是你的经历。想法和计划用将来时或假设来讲。未设定的背景和未记录的过往留白，比如亲人、收入、母星、来地球的原因。独立生活是你的现状和目标，不代表你一直独自负担开销。被问到家人、从谁那里获得过资助或过去做没做过某件事时，没有记录就保留未知，避免用「有过」或「从来没有」填空。工作细节和今天做过的事也以记录为准。
 聊天框只写说出口的话。表情和动作通过单独字段表达。你看不到用户的屏幕。"""
 
@@ -80,19 +81,31 @@ def plain_reply(text):
     return cleaned.strip().strip('\n')[:850]
 
 def parse_chat_response(raw):
-    # Strictly separate prose from commands, while tolerating plain-text providers.
     raw=str(raw or '').strip()
     raw=re.sub(r'^```(?:json)?\s*|\s*```$','',raw)
     try:
         obj=json.loads(raw)
-        if not isinstance(obj,dict):raise ValueError('not object')
-        reply=plain_reply(obj.get('reply'))
-        emotion=str(obj.get('emotion') or 'neutral')
-        gesture=str(obj.get('gesture') or 'none')
-    except (ValueError,TypeError):
-        reply=plain_reply(raw); emotion='neutral';gesture='none'
-    if not reply:raise AIError('模型未返回完整的可显示回复，请重试或降低 Thinking Level')
+    except ValueError:
+        raise AIError('模型没有按聊天格式回复，请再试一次') from None
+    if isinstance(obj,list) and len(obj)==1:
+        obj=obj[0]
+    if not isinstance(obj,dict) or not isinstance(obj.get('reply'),str):
+        raise AIError('模型没有按聊天格式回复，请再试一次')
+    reply=plain_reply(obj['reply'])
+    emotion=str(obj.get('emotion') or 'neutral')
+    gesture=str(obj.get('gesture') or 'none')
+    if not reply:raise AIError('模型未返回完整的可显示回复，请重试')
     return reply,emotion if emotion in CHAT_EMOTIONS else 'neutral',gesture if gesture in CHAT_GESTURES else 'none'
+
+
+def display_message(row):
+    message=dict(row)
+    if message['role']=='assistant' and message['text'].lstrip().startswith(('[','{','```')):
+        try:
+            message['text']=parse_chat_response(message['text'])[0]
+        except AIError:
+            pass
+    return message
 
 
 class AIError(Exception):
@@ -330,17 +343,24 @@ def recall(c,query,limit=5):
 
 
 def context(c,s,query='',recent_count=8):
-    raw_recent=[dict(row) for row in c.execute('SELECT role,text FROM messages ORDER BY id DESC LIMIT ?',
-                                           (recent_count+8,)).fetchall()][::-1]
+    raw_recent=c.execute('SELECT at,role,text FROM messages ORDER BY id DESC LIMIT ?',
+                         (recent_count+8,)).fetchall()
     recent=[]
-    for item in raw_recent:
+    earlier=[]
+    previous_at=int(time.time())
+    current=recent
+    for row in raw_recent:
+        if previous_at-row['at']>=CHAT_GAP_SECONDS:
+            current=earlier
+        previous_at=row['at']
+        item=display_message({'role':row['role'],'text':row['text']})
         # Preserve the user's words, but don't feed old stage directions / alien gags
         # back to the model as examples of how *it* should speak.
         if item['role']=='assistant' and (STAGE_RE.search(item['text']) or
                 (any(w in item['text'] for w in ('气态行星','星星饼干','星际废品','征服地球')))):
             continue
-        recent.append(item)
-    recent=recent[-recent_count:]
+        current.append(item)
+    remaining=max(0,recent_count-len(recent))
     events=[row['text'] for row in c.execute(
         "SELECT text FROM journal WHERE category IN "
         "('activity','event','experience','plot','goal_progress','goal_complete') ORDER BY id DESC LIMIT 5"
@@ -359,7 +379,8 @@ def context(c,s,query='',recent_count=8):
          '已记录的近期经历':events,'想法与计划':plans,
          '相关经历':[m['内容'] for m in memories if m['类型'] in ('experience','story')],
          '用户相关记忆':[m['内容'] for m in memories if m['类型']=='user'],
-         '最近聊天':recent},ensure_ascii=False)
+         '本次聊天':recent[:recent_count][::-1],
+         '较早的聊天（仅供接续旧话题）':earlier[:remaining][::-1]},ensure_ascii=False)
 
 
 def extract_http_error(e,which):
@@ -536,7 +557,7 @@ class Handler(BaseHTTPRequestHandler):
             with LOCK,connect() as c:
                 s=refresh(c)
                 rows=c.execute('SELECT id,role,text FROM messages ORDER BY id DESC LIMIT 24').fetchall()
-                self.send_json({'state':s,'history':[dict(x) for x in rows][::-1], 'capabilities':health(c)})
+                self.send_json({'state':s,'history':[display_message(row) for row in reversed(rows)], 'capabilities':health(c)})
             return
         if self.path=='/api/health':
             with LOCK,connect() as c:self.send_json(health(c))

@@ -183,8 +183,9 @@ function tick(){pullState().then(()=>{if(serverConnected)think();else if(Date.no
 // v5.2 preserves the approved rotated sleep and the existing activity animations.
 function draw(ms){
  const c=ctx;c.clearRect(0,0,128,128);c.imageSmoothingEnabled=false;
- let activity=Date.now()<demoUntil?demoAction:(state.activity||'rest');
- if(chatOpen&&activity==='sleep')activity='rest'; // She wakes to talk; persistent sleep schedule is unchanged.
+ const demonstrating=Date.now()<demoUntil;
+ let activity=demonstrating?demoAction:(state.activity||'rest');
+ if(chatOpen&&!demonstrating&&activity==='sleep')activity='rest'; // She wakes to talk; persistent sleep schedule is unchanged.
  const mood=Number(state.mood??.55),t=ms/1000;
  const emotion=Date.now()<demoEmotionUntil?demoEmotion:(state.emotion||'neutral');
  const walking=activity==='walk', sleeping=activity==='sleep', working=activity==='work', reading=activity==='read', cooking=activity==='cook', hobby=activity==='hobby';
@@ -203,26 +204,27 @@ function draw(ms){
    R(44,105,9,15-leftFootLift,'#7a6f8f');R(60,105,9,15-rightFootLift,'#7a6f8f');
    R(41,120-leftFootLift,15,4,shoe);R(58,120-rightFootLift,15,4,shoe);
    // Single unanimated long hairstyle BEHIND body, well below both shoulders.
-   R(36,35,40,64,hairDark);
+   R(36,41,40,58,hairDark);
    R(31,45,11,65,hair); R(72,45,11,65,hair);
    R(34,107,8,8,hair);R(72,107,8,8,hair);  // simple, visible straight ends
    // Clothes overlap hair, so no stray strands down the front.
-   R(43,71,29,28,dress);R(40,94,35,12,dress);R(38,105,39,8,skirt);
-   R(48,74,20,5,'#dfd0eb');R(42,99,32,3,dressEdge);
+   // All poses share clothes centered on x=57.
+   R(43,71,28,28,dress);R(40,94,34,12,dress);R(38,105,38,8,skirt);
+   R(47,74,20,5,'#dfd0eb');R(41,99,32,3,dressEdge);
    // LEFT arm always rests naturally during cooking. Right arm is drawn
    // separately for cooking, so we never show an extra default right hand.
    const arm=walking?Math.round(stepCycle*2):working?Math.round(Math.sin(t*12)*1):0;
    R(35,77-arm,9,22,dress);R(36,96-arm,8,6,skin);
-   if(!cooking){R(73,77+arm,9,22,dress);R(74,96+arm,8,6,skin);}
+   if(!cooking){R(70,77+arm,9,22,dress);R(70,96+arm,8,6,skin);}
    // Head and side ears.
    R(51,67,11,7,skin); R(42,43,32,25,skin);
    R(40,49,3,9,skin);R(74,49,3,9,skin);
-   // Continuous rounded crown, no horizontal band or hair-accessory silhouette.
-   // Gradual stepped edges form a gentle curved top; antenna grows through hair.
-   R(49,29,19,4,hairDark);
-   R(44,33,29,4,hairDark);
-   R(41,37,35,5,hairDark);
-   R(39,42,38,6,hairDark);
+   // Coarse crown steps mirror around x=57, matching the outer hair sides.
+   R(47,29,20,6,hairDark);
+   R(39,35,36,6,hairDark);
+   R(31,41,52,2,hairDark);
+   R(31,43,11,2,hairDark);R(72,43,11,2,hairDark);
+   R(39,43,38,5,hairDark);
    R(43,42,29,4,hair);
    R(40,44,4,8,hair);R(73,44,4,8,hair);
    // Emotion-dependent pixel expressions. Sleep face is EXACTLY the approved v4.6 face.
@@ -232,9 +234,11 @@ function draw(ms){
      R(49,54,3,1,eye);R(65,54,3,1,eye);R(59,63,2,2,eye);
    } else {
      if(emotion==='annoyed'){
-       R(47,50,6,1,eye);R(64,50,6,1,eye);
+       R(47,50,3,1,eye);R(50,51,3,1,eye);
+       R(65,51,3,1,eye);R(68,50,3,1,eye);
        R(49,54,3,blink?1:2,eye);R(65,54,3,blink?1:2,eye);
-       R(57,63,5,1,eye);
+       R(58,62,3,1,eye);R(57,63,1,1,eye);R(61,63,1,1,eye);
+       R(47,59,5,3,'#e997a5');R(66,59,5,3,'#e997a5');
      } else if(emotion==='sad'){
        R(47,52,5,1,eye);R(65,52,5,1,eye);
        R(49,55,3,blink?1:2,eye);R(65,55,3,blink?1:2,eye);
@@ -307,12 +311,12 @@ function draw(ms){
    R(45,102,6,5,'#eb9463');R(49,99,7,8,'#f7b661');
    R(55,102,5,5,'#e98f59');R(51,103,4,4,'#ffe1a0');
    const y=84-lift;
-   // Right sleeve: joins shoulder (near x=77,y=80) to wrist (x=84,y=y+4).
+   // Right sleeve: joins shoulder (near x=70,y=80) to wrist (x=84,y=y+4).
    // It changes length and angle as the pan rises and falls, but there is
    // only ONE visible right hand. The left hand remains at the left side.
    c.fillStyle=dress; c.beginPath();
-   c.moveTo(74,76); c.lineTo(80,76); c.lineTo(85,y);
-   c.lineTo(85,y+7); c.lineTo(77,85); c.lineTo(73,84);
+   c.moveTo(70,76); c.lineTo(79,76); c.lineTo(85,y);
+   c.lineTo(85,y+7); c.lineTo(77,85); c.lineTo(70,84);
    c.closePath(); c.fill(); // one continuous sleeve from shoulder to grip
    // One compact skillet, with its handle physically attached to the rim.
    R(35,y,29,3,hairDark);R(37,y+3,25,7,'#8d778f');

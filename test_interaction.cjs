@@ -12,14 +12,15 @@ class Element {
  focus(){}
  requestSubmit(){return get('form').fire('submit')}
  fire(t,props={}){assert(this.handlers[t],`missing ${t} on ${this.id}`);return this.handlers[t]({preventDefault(){},stopPropagation(){},...props});}
- getContext(){return {imageSmoothingEnabled:false,clearRect(){},fillRect(){},beginPath(){},moveTo(){},lineTo(){},quadraticCurveTo(){},stroke(){},save(){},translate(){},restore(){}};}
+ getContext(){return {imageSmoothingEnabled:false,clearRect(){},fillRect(){},beginPath(){},moveTo(){},lineTo(){},quadraticCurveTo(){},stroke(){},save(){},translate(){},rotate(angle){rotations.push(angle)},restore(){}};}
 }
+const rotations=[];
 const els = new Map();const get=id=>{if(!els.has(id))els.set(id,new Element(id));return els.get(id)};
 const doc={getElementById:get,createElement:(tag)=>new Element(tag),addEventListener(){},hidden:false};
 const data = new Map();const localStorage={getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v)};
 const sandbox={document:doc,location:{protocol:'file:',hostname:''},localStorage,Intl,Date,Math,console,JSON,
  setTimeout(){return 1},clearTimeout(){},setInterval(){return 1},requestAnimationFrame(){},AbortSignal};
-vm.runInNewContext(script,sandbox,{timeout:5000});
+vm.runInNewContext(script.replace('start();', "globalThis.testDraw=()=>draw(0);globalThis.testWake=()=>{demoUntil=0;state.activity='sleep';draw(0)};start();"),sandbox,{timeout:5000});
 (async()=>{
  get('avatar').fire('click');assert(!get('chat').classList.values.has('hidden'));
  get('message').value='你好';await get('form').fire('submit');
@@ -28,6 +29,12 @@ vm.runInNewContext(script,sandbox,{timeout:5000});
  assert(get('send').disabled===false);
  get('message').value='演示做饭';await get('form').fire('submit');
  assert(get('history').children.at(-1).textContent.includes('演示'));
+ get('message').value='演示睡觉';await get('form').fire('submit');
+ sandbox.testDraw();
+ assert(rotations.includes(-Math.PI/2),'Sleep demo must render while chat is open');
+ rotations.length=0;
+ sandbox.testWake();
+ assert.equal(rotations.length,0,'Ordinary sleeping character wakes for chat');
  get('message').value='安静一会儿';await get('form').fire('submit');
  assert(get('history').children.at(-1).textContent.includes('安静'));
  get('close').fire('click');assert(get('chat').classList.values.has('hidden'));

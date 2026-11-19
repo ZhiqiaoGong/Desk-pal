@@ -4,6 +4,7 @@ import json
 import tempfile
 import importlib.util
 import threading
+import time
 from pathlib import Path
 from http.server import ThreadingHTTPServer
 from urllib.request import Request, urlopen
@@ -14,6 +15,17 @@ spec.loader.exec_module(pal)
 assert pal.CANON['employment'].find('小书店')>=0
 assert pal.parse_chat_response('{"reply":"（天线耷拉）我在小书店兼职。","emotion":"curious","gesture":"nod"}')==('我在小书店兼职。','curious','nod')
 assert pal.parse_chat_response('{"reply":"我还没想过。","emotion":"INVALID","gesture":"laser"}')[1:]==('neutral','none')
+
+array_reply='[{"reply":"番茄炒蛋。","emotion":"proud","gesture":"tilt"}]'
+assert pal.parse_chat_response(array_reply)==('番茄炒蛋。','proud','tilt')
+assert pal.display_message({'role':'assistant','text':array_reply})['text']=='番茄炒蛋。'
+assert pal.display_message({'role':'user','text':array_reply})['text']==array_reply
+try:
+    pal.parse_chat_response('[{"reply":"截断了"')
+except pal.AIError:
+    pass
+else:
+    raise AssertionError('Incomplete JSON must not become chat text')
 
 with tempfile.TemporaryDirectory() as tmp:
     pal.DB=Path(tmp)/'chestnut.sqlite3'
@@ -32,6 +44,13 @@ with tempfile.TemporaryDirectory() as tmp:
         assert facts['已记录的近期经历']==['昨晚做了蛋炒饭']
         assert facts['相关经历']==['天线曾收到一段信号']
         assert facts['用户相关记忆']==['用户喜欢红茶']
+        assert facts['本次聊天']==[]
+        assert facts['较早的聊天（仅供接续旧话题）']==[{'role':'user','text':'那你有工作吗？'}]
+        c.execute('INSERT INTO messages(at,role,text) VALUES(?,?,?)',
+                  (int(time.time()),'user','今天喝到蜜桃抹茶了'))
+        resumed=json.loads(pal.context(c,pal.get_state(c),'味道不错'))
+        assert resumed['本次聊天']==[{'role':'user','text':'今天喝到蜜桃抹茶了'}]
+        assert resumed['较早的聊天（仅供接续旧话题）']==facts['较早的聊天（仅供接续旧话题）']
     orig=pal.request_ai
     calls=[]
     def fake(which,system,prompt,max_tokens,kind='chat'):
