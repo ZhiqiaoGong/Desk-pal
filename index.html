@@ -36,6 +36,16 @@ body{background:radial-gradient(ellipse at 75% 75%,#f2e5f1 0,transparent 48%),ra
 .hidden{display:none!important}@keyframes fadeHint{0%,72%{opacity:1}100%{opacity:0}}@keyframes enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:600px){.corner{right:0;bottom:0}.note{left:17px;top:16px}}
 @media(prefers-reduced-motion:reduce){.bubble,.chat{animation:none}}
+html:has(body.desktop-pet),html:has(body.desktop-chat),body.desktop-pet,body.desktop-chat{background:transparent}
+body.desktop-pet .note,body.desktop-pet .chat{display:none!important}
+body.desktop-pet .avatar{cursor:grab;width:200px;height:200px}
+body.desktop-chat .chat-head{height:36px;flex-shrink:0;cursor:grab}
+body.desktop-chat .chat-head button{cursor:pointer}
+body.desktop-pet .corner{inset:0;width:100%;height:100%}
+body.desktop-chat .note,body.desktop-chat .avatar,body.desktop-chat .bubble,body.desktop-chat .ground{display:none!important}
+body.desktop-chat .chat,body.desktop-chat .chat.expanded{position:fixed;inset:10px;width:auto;height:auto;display:flex;flex-direction:column;padding:12px;animation:none;box-shadow:0 3px 8px #5b48631c}
+body.desktop-chat .history{flex:1;min-height:0;height:auto}
+body.desktop-chat .line{font-size:14px}
 </style>
 </head>
 <body>
@@ -67,13 +77,17 @@ const fresh={date:'',interest:rand(IDEAS),goal_step:0,mood:.64,emotion:'curious'
 demo=demo&&typeof demo==='object'?{...fresh,...demo,goal_step:demo.goal_step??demo.progress??0,next_speak:demo.next_speak??demo.nextSpeak??fresh.next_speak}:fresh;
 let reactionGesture='none',reactionUntil=0,reactionStarted=0;
 let state=demo,chatOpen=false,serverConnected=false,chatReady=false,thoughtReady=false,simulated=false,sending=false,thinkBusy=false,bubbleTimer=null,loadedHistory=false,lastEvent='',history=[],demoAction='',demoUntil=0,demoEmotion='',demoEmotionUntil=0,offlineQuietUntil=0;
+const desktopMode=typeof window!=='undefined'&&window.webkit?.messageHandlers?.desktop ? location.hash : '';
+const desktopPet=desktopMode==='#desktop-pet',desktopChat=desktopMode==='#desktop-chat';
+function nativeMessage(body){if(desktopMode)window.webkit.messageHandlers.desktop.postMessage(body);}
+if(desktopMode)document.body.classList.add(desktopPet?'desktop-pet':'desktop-chat');
 const isFile=location.protocol==='file:';const isLocalServer=location.hostname==='127.0.0.1'||location.hostname==='localhost';
 function save(){try{localStorage.setItem(STORE,JSON.stringify(demo))}catch{}}
 function offlineTick(){let d=NOW().toLocaleDateString('en-CA');if(demo.date!==d){demo.date=d;}
  demo.activity=schedule(NOW());if(Date.now()-(demo.last_event||0)>20*60000){demo.last_event=Date.now();const effects=[[-.07,'把刚泡的茶弄洒了一点'],[.11,'总算搞定一件麻烦的小事'],[.06,'窗外的光刚好落在桌角'],[-.04,'翻了几页书却看不进去'],[.09,'想到了一个更省事的做饭方法']];const [delta,event]=rand(effects);demo.mood=Math.max(.12,Math.min(.96,demo.mood+delta));demo.emotion=delta>.05?'happy':delta<-.05?'annoyed':'curious';lastEvent=event;demo.signal=Math.random()<.045;}state=demo;save();}
 function setStatus(s){$('status').textContent=s}
 function showTime(){const date=NOW();$('dayline').textContent=new Intl.DateTimeFormat('zh-CN',{hour:'2-digit',minute:'2-digit'}).format(date)+' · '+(ACT[state.activity]||'发呆');}
-function speak(text,label='小栗的碎碎念'){if(chatOpen||Date.now()<offlineQuietUntil||NOW().getHours()<8||NOW().getHours()>=23)return;$('bubble-text').textContent=text;$('bubble-label').textContent=label;$('bubble').classList.remove('hidden');clearTimeout(bubbleTimer);bubbleTimer=setTimeout(()=>$('bubble').classList.add('hidden'),14000)}
+function speak(text,label='小栗的碎碎念'){if(chatOpen||(desktopPet&&window.desktopChatVisible)||Date.now()<offlineQuietUntil||NOW().getHours()<8||NOW().getHours()>=23)return;$('bubble-text').textContent=text;$('bubble-label').textContent=label;$('bubble').classList.remove('hidden');clearTimeout(bubbleTimer);bubbleTimer=setTimeout(()=>$('bubble').classList.add('hidden'),14000)}
 let oldestId=null,hasOlder=false,loadingOlder=false;
 function dateLabel(at){
   return new Date(at*1000).toLocaleDateString('zh-CN');
@@ -133,8 +147,21 @@ $('history').addEventListener('scroll',()=>{
 $('latest').addEventListener('click',()=>{
   $('history').scrollTop=$('history').scrollHeight;$('latest').classList.add('hidden');
 });
-function showChat(){if(chatOpen)return;chatOpen=true;$('bubble').classList.add('hidden');$('chat').classList.remove('hidden');renderHistory();if(!history.length)add('assistant','你来啦。我刚才在'+(ACT[state.activity]||'发呆')+'。');$('message').focus();}
-function hideChat(){chatOpen=false;$('chat').classList.add('hidden');}
+function showChat(){if(desktopPet){nativeMessage({action:'openChat'});return;}if(chatOpen)return;chatOpen=true;$('bubble').classList.add('hidden');$('chat').classList.remove('hidden');renderHistory();if(!history.length)add('assistant','你来啦。我刚才在'+(ACT[state.activity]||'发呆')+'。');$('message').focus();}
+function hideChat(){if(desktopChat){nativeMessage({action:'closeChat'});return;}chatOpen=false;$('chat').classList.add('hidden');}
+let pendingChatScroll=null;
+function restoreChatScroll(){
+  if(!pendingChatScroll)return;
+  const {atBottom,anchor,offset}=pendingChatScroll,list=$('history');
+  if(atBottom)list.scrollTop=list.scrollHeight;
+  else if(anchor?.isConnected)list.scrollTop+=anchor.getBoundingClientRect().top-list.getBoundingClientRect().top-offset;
+}
+if(desktopChat){
+  new ResizeObserver(restoreChatScroll).observe($('history'));
+  window.desktopResizeComplete=()=>{
+    requestAnimationFrame(()=>{restoreChatScroll();pendingChatScroll=null;});
+  };
+}
 function toggleChatSize(){
   const list=$('history');
   const atBottom=list.scrollHeight-list.clientHeight-list.scrollTop<=8;
@@ -150,9 +177,12 @@ function toggleChatSize(){
   button.setAttribute('aria-label',label);
   button.setAttribute('aria-pressed',String(expanded));
   button.title=label;
+  pendingChatScroll={atBottom,anchor,offset};
+  nativeMessage({action:'resizeChat',expanded});
   resizeMessage();
   if(atBottom)list.scrollTop=list.scrollHeight;
   else if(anchor)list.scrollTop+=anchor.getBoundingClientRect().top-list.getBoundingClientRect().top-offset;
+  if(!desktopChat)pendingChatScroll=null;
 }
 $('chat-size').addEventListener('click',toggleChatSize);
 function resizeMessage(){
@@ -214,10 +244,10 @@ async function pullState(){
 function localCommand(msg){
  const show=/(演示|给我看看|表演|模拟|试一下动作)/.test(msg);
  if(show){const faces=[['开心','happy'],['高兴','happy'],['好奇','curious'],['生气','annoyed'],['烦躁','annoyed'],['难过','sad'],['伤心','sad'],['困','sleepy'],['得意','proud'],['平静','neutral']];
-  const choice=faces.find(x=>msg.includes(x[0]));if(choice){demoEmotion=choice[1];demoEmotionUntil=Date.now()+30000;demoAction='rest';demoUntil=Date.now()+30000;return '好！我给你看看「'+choice[0]+'」是什么表情。';}}
+  const choice=faces.find(x=>msg.includes(x[0]));if(choice){demoEmotion=choice[1];demoEmotionUntil=Date.now()+30000;demoAction='rest';demoUntil=Date.now()+30000;nativeMessage({action:'demo',activity:demoAction,emotion:demoEmotion});return '好！我给你看看「'+choice[0]+'」是什么表情。';}}
 
  if(show){const examples=[['睡觉','sleep'],['睡','sleep'],['工作','work'],['上班','work'],['敲键盘','work'],['读书','read'],['看书','read'],['做饭','cook'],['吃饭','cook'],['散步','walk'],['走路','walk'],['研究','hobby'],['捣鼓','hobby'],['发呆','rest']];
-  const action=examples.find(x=>msg.includes(x[0]));if(action){demoAction=action[1];demoUntil=Date.now()+30000;return '好呀！我先演示一小会儿「'+ACT[action[1]]+'」。';}}
+  const action=examples.find(x=>msg.includes(x[0]));if(action){demoAction=action[1];demoUntil=Date.now()+30000;nativeMessage({action:'demo',activity:demoAction});return '好呀！我先演示一小会儿「'+ACT[action[1]]+'」。';}}
  if(!serverConnected&&/(不用安静|恢复说话|可以说话|解除安静)/.test(msg)){offlineQuietUntil=0;return '好，可以正常聊天了。';}
  if(!serverConnected&&/(安静|先别打扰|免打扰)/.test(msg)){offlineQuietUntil=Date.now()+60*60000;return '好，我先安静一小时。你叫我，我还是会回应的。';}
  return null;
@@ -267,15 +297,15 @@ async function submit(ev){
  }finally{sending=false;$('send').disabled=false;if(chatOpen)$('message').focus();}
 }
 $('form').addEventListener('submit',submit);$('avatar').addEventListener('click',()=>chatOpen?hideChat():showChat());$('avatar').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();chatOpen?hideChat():showChat();}});$('close').addEventListener('click',hideChat);document.addEventListener('keydown',e=>{if(e.key==='Escape')hideChat()});
-async function think(){if(!serverConnected||!thoughtReady||thinkBusy||NOW().getHours()<8||NOW().getHours()>=23||Date.now()<Number(state.next_thought||0)*1000)return;thinkBusy=true;try{const res=await fetch('/api/think',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(32000)});const data=await res.json();if(res.ok&&data.state)state=data.state;if(res.ok&&data.reply){if(!chatOpen&&Date.now()>=demo.next_speak){speak(data.reply,data.source==='mock'?'模拟念头 · 非真实AI':'小栗突然想到');demo.next_speak=Date.now()+3600000+Math.random()*7200000;save();}}}catch{}finally{thinkBusy=false;}}
+async function think(){if(desktopChat||!serverConnected||!thoughtReady||thinkBusy||NOW().getHours()<8||NOW().getHours()>=23||Date.now()<Number(state.next_thought||0)*1000)return;thinkBusy=true;try{const res=await fetch('/api/think',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(32000)});const data=await res.json();if(res.ok&&data.state)state=data.state;if(res.ok&&data.reply){if(!chatOpen&&Date.now()>=demo.next_speak){speak(data.reply,data.source==='mock'?'模拟念头 · 非真实AI':'小栗突然想到');demo.next_speak=Date.now()+3600000+Math.random()*7200000;save();}}}catch{}finally{thinkBusy=false;}}
 function tick(){pullState().then(()=>{if(serverConnected)think();else if(Date.now()>=demo.next_speak){speak(rand(['刚刚发现一家店的招牌设计得挺有意思。','今天有点想学一道新菜。','本来打算读书，结果看了半天窗外。']));demo.next_speak=Date.now()+3600000+Math.random()*7200000;save();}});}
 // 128×128 native grid. Sleep renders the SAME standing girl sprite rotated a true 90°; no rescaling.
 // v5.2 preserves the approved rotated sleep and the existing activity animations.
-function draw(ms){
+function draw(ms,scheduleNext=true){
  const c=ctx;c.clearRect(0,0,128,128);c.imageSmoothingEnabled=false;
  const demonstrating=Date.now()<demoUntil;
  let activity=demonstrating?demoAction:(state.activity||'rest');
- if(chatOpen&&!demonstrating&&activity==='sleep')activity='rest'; // She wakes to talk; persistent sleep schedule is unchanged.
+ if((chatOpen||(desktopPet&&window.desktopChatVisible))&&!demonstrating&&activity==='sleep')activity='rest'; // She wakes to talk; persistent sleep schedule is unchanged.
  const mood=Number(state.mood??.55),t=ms/1000;
  const emotion=Date.now()<demoEmotionUntil?demoEmotion:(state.emotion||'neutral');
  const walking=activity==='walk', sleeping=activity==='sleep', working=activity==='work', reading=activity==='read', cooking=activity==='cook', hobby=activity==='hobby';
@@ -379,7 +409,7 @@ function draw(ms){
    c.rotate(-Math.PI/2);
    girl(true);
    c.restore();
-   requestAnimationFrame(draw);return;
+   if(scheduleNext)requestAnimationFrame(draw);return;
  }
  c.save();
  const reacting=Date.now()<reactionUntil;
@@ -420,10 +450,72 @@ function draw(ms){
  }
  // Walk needs only swinging limbs; there are deliberately no trail bars or decorative props.
  c.restore();
- requestAnimationFrame(draw);
+ if(scheduleNext)requestAnimationFrame(draw);
 }
-function start(){offlineTick();history=(demo.history||[]).slice(-20);showTime();pullState();requestAnimationFrame(draw);setInterval(tick,60_000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick()});setTimeout(()=>speak('今天想把手头的事慢慢做好。先从一件小事开始。'),3200);}
+const OPENINGS={
+ rest:['来啦。一起发会儿呆？','今天先慢慢来。','唔，给你留了旁边的位置。'],
+ work:['我先忙一会儿，你随意。','今天也要和一堆书打交道。','上班中，允许短暂走神。'],
+ read:['你先坐，我把这页看完。','看书时间。可以小声打扰。','想在书里多待一会儿。'],
+ cook:['吃饭这件事，值得认真对待。','我先顾着锅，你先坐。','今天想把饭好好做。'],
+ hobby:['我在捣鼓点东西，先不剧透。','给我的小研究留一点时间。','认真玩一会儿。'],
+ walk:['出来溜达一会儿。','今天走慢一点也行。','散步不用每次都有目的地。'],
+ sleep:['唔……','我先睡了哦。','快没电了……']};
+function openingMurmur(){
+ if(desktopChat||chatOpen||(desktopPet&&window.desktopChatVisible)||Date.now()<offlineQuietUntil||NOW().getHours()<8||NOW().getHours()>=23)return;
+ const memory=desktopPet?(window.petPreferences?.opening||{}):(demo.opening||{});
+ if(Date.now()-(Number(memory.at)||0)<10*60*1000)return;
+ const recent=Array.isArray(memory.recent)?memory.recent:[];
+ const pool=[...(OPENINGS[state.activity]||OPENINGS.rest),'你忙你的，我待这儿。','嗯，今天也在。'];
+ const available=pool.filter(line=>!recent.includes(line));
+ const line=rand(available.length?available:pool);
+ speak(line);
+ const value={at:Date.now(),recent:[...recent,line].slice(-6)};
+ if(desktopPet){window.petPreferences.opening=value;nativeMessage({action:'saveOpening',value});}
+ else{demo.opening=value;save();}
+}
+function start(){offlineTick();history=(demo.history||[]).slice(-20);showTime();pullState();if(desktopPet)draw(0);else requestAnimationFrame(draw);setInterval(tick,60_000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick()});setTimeout(openingMurmur,3200);}
+if(desktopMode){
+  window.desktopRefresh=pullState;
+  let reportGeometry=()=>{};
+  if(desktopPet){
+    let previousGeometry='';
+    reportGeometry=()=>{
+      const pixels=ctx.getImageData(0,0,128,128).data;
+      let left=128,top=128,right=-1,bottom=-1;
+      for(let y=0;y<128;y++)for(let x=0;x<128;x++){
+        if(pixels[(y*128+x)*4+3]>32){
+          left=Math.min(left,x);right=Math.max(right,x);
+          top=Math.min(top,y);bottom=Math.max(bottom,y);
+        }
+      }
+      if(right<left)return;
+      const rect=canvas.getBoundingClientRect();
+      const scale=rect.width/128;
+      const bubble=$('bubble').getBoundingClientRect();
+      const geometry={action:'petGeometry',
+        sprite:{x:rect.left+left*scale,y:rect.top+top*scale,width:(right-left+1)*scale,height:(bottom-top+1)*scale},
+        bubble:$('bubble').classList.contains('hidden')?null:{x:bubble.left,y:bubble.top,width:bubble.width,height:bubble.height}};
+      const serialized=JSON.stringify(geometry);
+      if(serialized!==previousGeometry){nativeMessage(geometry);previousGeometry=serialized;}
+    };
+    window.desktopSetSize=size=>{
+      if(![160,200,256].includes(size))size=200;
+      $('avatar').style.width=size+'px';$('avatar').style.height=size+'px';
+      draw(0,false);reportGeometry();
+    };
+    window.desktopSetSize(window.petPreferences?.size||200);
+    setInterval(reportGeometry,250);
+  }
+  window.desktopActivate=()=>{showChat();pullState();$('message').focus();};
+  window.desktopDemo=data=>{
+    if(Object.hasOwn(ACT,data.activity)){demoAction=data.activity;demoUntil=Date.now()+30000;}
+    if(data.emotion){demoEmotion=data.emotion;demoEmotionUntil=Date.now()+30000;}
+    draw(0,false);
+    reportGeometry();
+  };
+}
 start();
+if(desktopChat)showChat();
 })();
 </script>
 </body>

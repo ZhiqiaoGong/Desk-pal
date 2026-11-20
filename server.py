@@ -740,10 +740,11 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     init()
-    print(f'小栗 v5.4：http://127.0.0.1:{PORT}',flush=True)
+    http=ThreadingHTTPServer(('127.0.0.1',PORT),Handler)
+    print(f'小栗 v5.4：http://127.0.0.1:{http.server_port}',flush=True)
     print(f'小栗记忆：{DB}',flush=True)
     if mock_enabled():print('⚠️ PAL_MOCK_AI=1：开发模拟模式，不是真实 AI',flush=True)
     print('若未设置 API Key，聊天只显示明确的未配置提示，不会伪装成 AI。',flush=True)
-    ThreadingHTTPServer(('127.0.0.1',PORT),Handler).serve_forever()
+    http.serve_forever()
 
 if __name__=='__main__':main()
