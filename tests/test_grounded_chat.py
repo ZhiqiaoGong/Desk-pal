@@ -1,4 +1,4 @@
-"""v5.4: schema, true/future boundary, stage removal, persistence and real chat round trip (fake model)."""
+"""v6.0: schema, true/future boundary, stage removal, persistence and real chat round trip (fake model)."""
 import os
 import json
 import tempfile
@@ -77,7 +77,7 @@ with tempfile.TemporaryDirectory() as tmp:
             assert sum('天线耷拉' in r['text'] for r in rows)==0
             state=pal.get_state(c);assert state['emotion']=='sad' and state['chat_gesture']=='look_up'
         with urlopen(base+'/api/state',timeout=5) as r:state=json.load(r)
-        assert state['capabilities']['version']=='5.4'
+        assert state['capabilities']['version']=='6.0'
         print('PASS canon / unknown facts / stage-free JSON reply / emotional event / stable SQLite')
     finally:
         server.shutdown();server.server_close();pal.request_ai=orig

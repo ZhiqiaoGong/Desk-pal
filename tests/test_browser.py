@@ -27,7 +27,7 @@ with sync_playwright() as p:
           if(url==='/api/state')return {ok:true,json:async()=>({
               state:{activity:'read',mood:0.7,interest:'给云取名字',energy:0.8,signal:false},
               history:window.fakeMsgs,
-              capabilities:{version:'5.4',chat:{configured:window.ready},thought:{configured:false},mock:true}
+              capabilities:{version:'6.0',chat:{configured:window.ready},thought:{configured:false},mock:true}
           })};
           if(url==='/api/chat'){
               if(window.failReply)return {ok:false,json:async()=>({error:'模拟服务故障'})};

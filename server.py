@@ -1,8 +1,8 @@
-"""小栗的角落 v5.4 — local-first desktop companion HTML service.
+"""小栗的角落 v6.0 — local-first desktop companion HTML service.
 
 Python standard library only. API keys are read on the server, never sent to JS.
-The character illustration is unchanged from v4.6; this release focuses on reliable
-cloud chat, autonomous decisions, durable SQLite memories, expressive animation, and a fresh grounded persona.
+Native macOS panels host this UI with cloud chat, autonomous activities,
+durable SQLite memories and expressive pixel animation.
 """
 from __future__ import annotations
 
@@ -518,7 +518,7 @@ def health(c):
                 error=str(exc)
         return {'provider':which,'configured':configured(which) and error is None,
                 'model':model,'error':error}
-    return {'server':True,'version':'5.4','chat':capability('chat',cp),
+    return {'server':True,'version':'6.0','chat':capability('chat',cp),
             'thought':capability('thought',tp),'mock':mock_enabled(),
             'usage_today':{'chat':usage_today(c,'chat'),'thought':usage_today(c,'thought')},
             'attempts_today':{'chat':attempts_today(c,'chat'),'thought':attempts_today(c,'thought')},
@@ -741,7 +741,7 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     init()
     http=ThreadingHTTPServer(('127.0.0.1',PORT),Handler)
-    print(f'小栗 v5.4：http://127.0.0.1:{http.server_port}',flush=True)
+    print(f'小栗 v6.0：http://127.0.0.1:{http.server_port}',flush=True)
     print(f'小栗记忆：{DB}',flush=True)
     if mock_enabled():print('⚠️ PAL_MOCK_AI=1：开发模拟模式，不是真实 AI',flush=True)
     print('若未设置 API Key，聊天只显示明确的未配置提示，不会伪装成 AI。',flush=True)

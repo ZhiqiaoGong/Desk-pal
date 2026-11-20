@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>小栗的角落 · v5.4</title>
+<title>小栗的角落 · v6.0</title>
 <style>
 :root { color-scheme: light; font-family: -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; color:#544558; }
 *{box-sizing:border-box} html,body{margin:0;min-height:100%;height:100%;}
@@ -224,9 +224,9 @@ async function pullState(){
    const data=await res.json();
    state=data.state;serverConnected=true;
    const caps=data.capabilities||{};
-   if(caps.version!=='5.4'){
+   if(caps.version!=='6.0'){
      chatReady=false;thoughtReady=false;simulated=false;
-     setStatus('当前仍连接旧版小栗服务。请停止旧服务，再启动 v5.4');showTime();return;
+     setStatus('当前仍连接旧版小栗服务。请停止旧服务，再启动 v6.0');showTime();return;
    }
    chatReady=!!caps.chat?.configured;
    thoughtReady=!!caps.thought?.configured;simulated=!!caps.mock;

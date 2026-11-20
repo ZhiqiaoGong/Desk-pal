@@ -5,3 +5,16 @@ __pycache__/
 *.pyc
 /dist/
 /.build/
+
+# Private local configuration and conversation data
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+gemini-api-key
+*.log
+.venv/
